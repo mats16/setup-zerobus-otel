@@ -68,8 +68,9 @@ function printSummary(
   console.log();
 
   if (userConfig.authMethod === "u2m") {
+    const profile = userConfig.profileName ?? "DEFAULT";
     console.log(t().nextSteps);
-    console.log(t().u2mNextStep(userConfig.profileName!));
+    console.log(t().u2mNextStep(profile));
     console.log(t().u2mNextStepDesc);
   } else if (userConfig.authMethod === "m2m") {
     console.log(t().nextSteps);

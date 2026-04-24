@@ -2,7 +2,6 @@ export type Locale = "ja" | "en";
 
 export interface Messages {
   // prompts
-  selectTargetTool: string;
   urlMustBeHttps: string;
   enterValidHostname: string;
   enterValidUrl: string;
@@ -50,7 +49,6 @@ export interface Messages {
 }
 
 const ja: Messages = {
-  selectTargetTool: "導入先のツールを選択してください:",
   urlMustBeHttps: "URL は https である必要があります",
   enterValidHostname: "有効なホスト名を入力してください",
   enterValidUrl: "有効な URL を入力してください",
@@ -100,7 +98,6 @@ const ja: Messages = {
 };
 
 const en: Messages = {
-  selectTargetTool: "Select the target tool:",
   urlMustBeHttps: "URL must use https",
   enterValidHostname: "Please enter a valid hostname",
   enterValidUrl: "Please enter a valid URL",

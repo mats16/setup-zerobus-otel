@@ -140,3 +140,6 @@ vite.config.ts.timestamp-*
 
 # Bun
 bun.lockb
+
+# Generated settings
+.claude/settings.json

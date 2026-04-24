@@ -24,7 +24,7 @@ The CLI follows a pipeline: **prompts → config generation → file writing**.
 - `src/index.ts` — Entry point. Orchestrates the flow: banner → collect input → generate config → preview → confirm → apply → summary.
 - `src/prompts.ts` — All interactive prompts via `@inquirer/prompts`. Exports `collectUserConfig()` which returns a `UserConfig`.
 - `src/config-generator.ts` — Pure logic. Transforms `UserConfig` into `GeneratedConfig` (settings.json env block + optional otelHeadersHelper path). Calls into `script-generator` for token scripts.
-- `src/script-generator.ts` — Generates bash scripts for dynamic token retrieval (`gen_otel_headers_u2m.sh` / `gen_otel_headers_m2m.sh`). Returns `null` for PAT auth.
+- `src/script-generator.ts` — Generates Node.js scripts for dynamic token retrieval (`gen_otel_headers_u2m.js` / `gen_otel_headers_m2m.js`). Returns `null` for PAT auth.
 - `src/file-writer.ts` — Reads existing `settings.json`, deep-merges new config (preserving hooks, permissions, mcpServers, etc.), writes files, chmod +x on scripts.
 - `src/types.ts` — Shared type definitions. `UserConfig` is the central data model passed between modules.
 

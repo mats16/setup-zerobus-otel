@@ -22,18 +22,6 @@ export async function promptLocale(): Promise<Locale> {
   });
 }
 
-async function promptTargetTool(): Promise<TargetTool> {
-  return select({
-    message: t().selectTargetTool,
-    choices: [
-      {
-        name: "Claude Code",
-        value: "claude-code" as const,
-      },
-    ],
-  });
-}
-
 function normalizeUrl(value: string): string {
   let url = value.trim();
   if (!url.startsWith("https://") && !url.startsWith("http://")) {
@@ -113,7 +101,10 @@ async function parseDatabricksCfg(): Promise<Map<string, ProfileInfo>> {
     if (currentProfile) {
       const kvMatch = trimmed.match(/^(\w+)\s*=\s*(.+)$/);
       if (kvMatch?.[1] && kvMatch[2]) {
-        sections.get(currentProfile)![kvMatch[1]] = kvMatch[2].trim();
+        const section = sections.get(currentProfile);
+        if (section) {
+          section[kvMatch[1]] = kvMatch[2].trim();
+        }
       }
     }
   }
@@ -261,7 +252,7 @@ export async function collectUserConfig(): Promise<UserConfig> {
   const locale = await promptLocale();
   setLocale(locale);
 
-  const targetTool = await promptTargetTool();
+  const targetTool: TargetTool = "claude-code";
   const authMethod = await promptAuthMethod();
 
   let workspaceUrl: string;
