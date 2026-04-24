@@ -94,17 +94,16 @@ async function writeScript(script: GeneratedScript): Promise<void> {
 export async function applyConfig(
   config: GeneratedConfig,
   settingsTarget: SettingsTarget,
-): Promise<{ settingsPath: string; scriptPath: string | null }> {
+): Promise<{ settingsPath: string }> {
   const settingsPath = resolveSettingsPath(settingsTarget);
   const existing = await readExistingSettings(settingsPath);
   const merged = mergeSettings(existing, config.settingsAdditions);
 
   const writes: Promise<void>[] = [writeSettings(settingsPath, merged)];
-  const scriptPath = config.tokenScript?.filePath ?? null;
   if (config.tokenScript) {
     writes.push(writeScript(config.tokenScript));
   }
   await Promise.all(writes);
 
-  return { settingsPath, scriptPath };
+  return { settingsPath };
 }

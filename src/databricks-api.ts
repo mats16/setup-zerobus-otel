@@ -73,10 +73,13 @@ function getCliAccessToken(profileName: string): string {
         timeout: 10000,
       }),
     );
-  } catch {
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") {
+      throw new Error(t().databricksCliNotFound);
+    }
     execFileSync("databricks", ["auth", "login", "--profile", profileName], {
       stdio: "inherit",
-      timeout: 10000,
+      timeout: 120_000,
     });
     return parseTokenOutput(
       execFileSync("databricks", ["auth", "token", "--profile", profileName], {
@@ -297,6 +300,7 @@ export async function createOrGetExperiment(
     );
     if (response.experiment_id) return response.experiment_id;
   } catch (error) {
+    if (!isAlreadyExistsError(error)) throw error;
     const existingExperimentId = await getExperimentByName(
       config,
       resolvedName,

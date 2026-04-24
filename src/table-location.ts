@@ -6,11 +6,11 @@ const SIGNAL_TABLE_SUFFIX: Record<Signal, string> = {
   traces: "otel_spans",
 };
 
-export function formatUcTablePrefix(location: UcTablePrefix): string {
+function formatUcTablePrefix(location: UcTablePrefix): string {
   return `${location.catalogName}.${location.schemaName}.${location.tablePrefix}`;
 }
 
-export function formatLegacyTablePrefix(location: UcTablePrefix): string {
+function formatLegacyTablePrefix(location: UcTablePrefix): string {
   return `${formatUcTablePrefix(location)}_`;
 }
 

@@ -72,6 +72,7 @@ export interface Messages {
   missingPat: string;
   missingM2mEnv: string;
   tokenParseError: string;
+  databricksCliNotFound: string;
   currentUserError: string;
   databricksApiError: (status: number, message: string) => string;
   sqlWarehouseMayBeRequired: string;
@@ -155,6 +156,8 @@ const ja: Messages = {
   missingM2mEnv:
     "DATABRICKS_CLIENT_ID と DATABRICKS_CLIENT_SECRET を環境変数に設定してください",
   tokenParseError: "Databricks 認証トークンの取得結果を解析できませんでした",
+  databricksCliNotFound:
+    "Databricks CLI が見つかりません。https://docs.databricks.com/dev-tools/cli/install.html を参照してインストールしてください。",
   currentUserError: "Databricks の現在ユーザー名を取得できませんでした",
   databricksApiError: (status, message) =>
     `Databricks API エラー (${status}): ${message}`,
@@ -239,6 +242,8 @@ const en: Messages = {
   missingM2mEnv:
     "Set DATABRICKS_CLIENT_ID and DATABRICKS_CLIENT_SECRET as environment variables",
   tokenParseError: "Failed to parse Databricks auth token response",
+  databricksCliNotFound:
+    "Databricks CLI not found. Please install it: https://docs.databricks.com/dev-tools/cli/install.html",
   currentUserError: "Failed to resolve the current Databricks username",
   databricksApiError: (status, message) =>
     `Databricks API error (${status}): ${message}`,
