@@ -1,6 +1,6 @@
 {
   "name": "setup-zerobus-otel",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "Interactive CLI to configure OpenTelemetry sending to Databricks (zerobus) for Claude Code and Codex",
   "type": "module",
   "bin": {
