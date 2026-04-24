@@ -25,6 +25,22 @@ export async function promptLocale(): Promise<Locale> {
   });
 }
 
+async function promptTargetTool(): Promise<TargetTool> {
+  return select({
+    message: t().selectTargetTool,
+    choices: [
+      {
+        name: t().targetClaudeCode,
+        value: "claude-code" as const,
+      },
+      {
+        name: t().targetCodex,
+        value: "codex" as const,
+      },
+    ],
+  });
+}
+
 function normalizeUrl(value: string): string {
   let url = value.trim();
   if (!url.startsWith("https://") && !url.startsWith("http://")) {
@@ -225,7 +241,9 @@ async function promptTableSetupMode(): Promise<TableSetupMode> {
   });
 }
 
-async function promptTableSetup(): Promise<TableSetupConfig> {
+async function promptTableSetup(
+  targetTool: TargetTool,
+): Promise<TableSetupConfig> {
   const mode = await promptTableSetupMode();
   const schema = await input({
     message: t().tableSchemaPrompt,
@@ -244,7 +262,7 @@ async function promptTableSetup(): Promise<TableSetupConfig> {
 
   const rawTablePrefix = await input({
     message: t().tablePrefixPrompt,
-    default: "claude",
+    default: targetTool === "codex" ? "codex" : "claude",
     validate: (value) => {
       const trimmed = value.trim();
       if (!trimmed) return t().tablePrefixValidation;
@@ -273,7 +291,25 @@ async function promptTableSetup(): Promise<TableSetupConfig> {
   return tableSetup;
 }
 
-async function promptSettingsTarget(): Promise<SettingsTarget> {
+async function promptSettingsTarget(
+  targetTool: TargetTool,
+): Promise<SettingsTarget> {
+  if (targetTool === "codex") {
+    return select({
+      message: t().codexSettingsTargetPrompt,
+      choices: [
+        {
+          name: t().codexSettingsGlobal,
+          value: "global" as const,
+        },
+        {
+          name: t().codexSettingsProject,
+          value: "project" as const,
+        },
+      ],
+    });
+  }
+
   return select({
     message: t().settingsTargetPrompt,
     choices: [
@@ -344,12 +380,27 @@ async function promptContentOptions(): Promise<TelemetryContentOptions> {
   };
 }
 
+async function promptCodexContentOptions(): Promise<TelemetryContentOptions> {
+  const logUserPrompts = await confirm({
+    message: t().codexLogUserPromptPrompt,
+    default: false,
+  });
+  return {
+    logUserPrompts,
+    logToolDetails: false,
+    logToolContent: false,
+  };
+}
+
 export async function collectUserConfig(): Promise<UserConfig> {
   const locale = await promptLocale();
   setLocale(locale);
 
-  const targetTool: TargetTool = "claude-code";
-  const authMethod = await promptAuthMethod();
+  const targetTool = await promptTargetTool();
+  const authMethod = targetTool === "codex" ? "pat" : await promptAuthMethod();
+  if (targetTool === "codex") {
+    console.log(t().codexPatOnlyNotice);
+  }
 
   let workspaceUrl: string;
   let scriptLocation = "";
@@ -367,11 +418,14 @@ export async function collectUserConfig(): Promise<UserConfig> {
     pat = await promptPat();
   }
 
-  const tableSetup = await promptTableSetup();
-  const settingsTarget = await promptSettingsTarget();
+  const tableSetup = await promptTableSetup(targetTool);
+  const settingsTarget = await promptSettingsTarget(targetTool);
   const enabledSignals = await promptSignals();
-  const contentOptions = await promptContentOptions();
-  if (authMethod !== "pat") {
+  const contentOptions =
+    targetTool === "codex"
+      ? await promptCodexContentOptions()
+      : await promptContentOptions();
+  if (targetTool === "claude-code" && authMethod !== "pat") {
     scriptLocation = await promptScriptLocation();
   }
 
