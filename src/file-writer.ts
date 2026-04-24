@@ -13,6 +13,9 @@ function resolveSettingsPath(target: SettingsTarget): string {
   if (target === "global") {
     return path.join(os.homedir(), ".claude", "settings.json");
   }
+  if (target === "local") {
+    return path.join(process.cwd(), ".claude", "settings.local.json");
+  }
   return path.join(process.cwd(), ".claude", "settings.json");
 }
 

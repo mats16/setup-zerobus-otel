@@ -1,7 +1,18 @@
+import {
+  createOrGetExperiment,
+  createOrGetTraceLocation,
+  ensureSchemaExists,
+  linkExperimentTraceLocation,
+} from "./databricks-api.js";
 import { generateConfig } from "./config-generator.js";
 import { applyConfig } from "./file-writer.js";
 import { t } from "./i18n.js";
-import { collectUserConfig, confirmApply } from "./prompts.js";
+import {
+  collectUserConfig,
+  confirmApply,
+  promptExperimentName,
+  promptExperimentRetryAction,
+} from "./prompts.js";
 import type { GeneratedConfig, UserConfig } from "./types.js";
 
 function printBanner(): void {
@@ -19,8 +30,15 @@ function printPreview(config: GeneratedConfig, userConfig: UserConfig): void {
   const target =
     userConfig.settingsTarget === "global"
       ? "~/.claude/settings.json"
-      : ".claude/settings.json";
+      : userConfig.settingsTarget === "local"
+        ? ".claude/settings.local.json"
+        : ".claude/settings.json";
   console.log(`  ${t().previewTarget}: ${target}`);
+  const tableSetup =
+    userConfig.tableSetup.mode === "create"
+      ? t().previewTableCreate
+      : t().previewTableExisting;
+  console.log(`  ${t().previewTableSetup}: ${tableSetup}`);
   console.log();
 
   console.log("  env:");
@@ -53,21 +71,77 @@ function printPreview(config: GeneratedConfig, userConfig: UserConfig): void {
   console.log();
 }
 
+async function prepareTables(userConfig: UserConfig): Promise<void> {
+  if (userConfig.tableSetup.mode !== "create") {
+    return;
+  }
+
+  console.log();
+  const schema = `${userConfig.tableSetup.location.catalogName}.${userConfig.tableSetup.location.schemaName}`;
+  console.log(t().ensuringSchema(schema));
+  await ensureSchemaExists(userConfig);
+  console.log(t().schemaReady(schema));
+
+  console.log(t().creatingTables);
+  const result = await createOrGetTraceLocation(userConfig);
+  userConfig.tableSetup.resolvedTableNames = result.tableNames;
+  console.log(t().createdTables);
+
+  await linkExperimentWithRetry(userConfig);
+}
+
+async function linkExperimentWithRetry(userConfig: UserConfig): Promise<void> {
+  let experimentName = userConfig.tableSetup.experimentName;
+
+  while (experimentName) {
+    try {
+      console.log(t().creatingExperiment(experimentName));
+      const experimentId = await createOrGetExperiment(
+        userConfig,
+        experimentName,
+      );
+      userConfig.tableSetup.experimentName = experimentName;
+      userConfig.tableSetup.experimentId = experimentId;
+      await linkExperimentTraceLocation(userConfig, experimentId);
+      console.log(t().linkedExperiment(experimentName, experimentId));
+      return;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      console.log(t().experimentLinkFailed(message));
+      const action = await promptExperimentRetryAction();
+      if (action === "skip") {
+        userConfig.tableSetup.experimentName = undefined;
+        userConfig.tableSetup.experimentId = undefined;
+        console.log(t().experimentLinkSkipped);
+        return;
+      }
+
+      experimentName = (await promptExperimentName()).trim();
+      if (!experimentName) {
+        userConfig.tableSetup.experimentName = undefined;
+        userConfig.tableSetup.experimentId = undefined;
+        console.log(t().experimentLinkSkipped);
+        return;
+      }
+    }
+  }
+}
+
 function printSummary(
-  result: { settingsPath: string; scriptPath: string | null },
+  result: { settingsPath: string },
   userConfig: UserConfig,
 ): void {
   console.log();
   console.log(t().setupComplete);
   console.log();
   console.log(`  Settings: ${result.settingsPath}`);
-  if (result.scriptPath) {
-    console.log(`  Script:   ${result.scriptPath}`);
-  }
   console.log(`  Signals:  ${userConfig.enabledSignals.join(", ")}`);
   console.log();
 
-  if (userConfig.authMethod === "u2m") {
+  if (
+    userConfig.authMethod === "u2m" &&
+    userConfig.tableSetup.mode !== "create"
+  ) {
     const profile = userConfig.profileName ?? "DEFAULT";
     console.log(t().nextSteps);
     console.log(t().u2mNextStep(profile));
@@ -84,7 +158,7 @@ async function main(): Promise<void> {
   printBanner();
 
   const userConfig = await collectUserConfig();
-  const generatedConfig = generateConfig(userConfig);
+  let generatedConfig = generateConfig(userConfig);
 
   printPreview(generatedConfig, userConfig);
 
@@ -96,6 +170,8 @@ async function main(): Promise<void> {
     process.exit(0);
   }
 
+  await prepareTables(userConfig);
+  generatedConfig = generateConfig(userConfig);
   const result = await applyConfig(generatedConfig, userConfig.settingsTarget);
   printSummary(result, userConfig);
 }
