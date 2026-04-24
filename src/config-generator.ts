@@ -1,6 +1,7 @@
 import os from "node:os";
 import path from "node:path";
 import { generateTokenScript } from "./script-generator.js";
+import { fallbackTableName } from "./table-location.js";
 import type {
   GeneratedConfig,
   SettingsAdditions,
@@ -18,12 +19,6 @@ const SIGNAL_ENDPOINT_PATH: Record<Signal, string> = {
   logs: "logs",
   metrics: "metrics",
   traces: "traces",
-};
-
-const SIGNAL_TABLE_SUFFIX: Record<Signal, string> = {
-  logs: "otel_logs",
-  metrics: "otel_metrics",
-  traces: "otel_spans",
 };
 
 export function expandTilde(p: string): string {
@@ -56,7 +51,7 @@ export function generateConfig(config: UserConfig): GeneratedConfig {
     workspaceUrl,
     authMethod,
     enabledSignals,
-    tablePrefix,
+    tableSetup,
     contentOptions,
   } = config;
 
@@ -84,7 +79,9 @@ export function generateConfig(config: UserConfig): GeneratedConfig {
     env[`OTEL_EXPORTER_OTLP_${key}_ENDPOINT`] =
       `${workspaceUrl}/api/2.0/otel/v1/${SIGNAL_ENDPOINT_PATH[signal]}`;
 
-    const tableName = `${tablePrefix}${SIGNAL_TABLE_SUFFIX[signal]}`;
+    const tableName =
+      tableSetup.resolvedTableNames?.[signal] ??
+      fallbackTableName(tableSetup.location, signal);
     env[`OTEL_EXPORTER_OTLP_${key}_HEADERS`] = buildHeaders(
       tableName,
       authMethod === "pat" ? config.pat : undefined,

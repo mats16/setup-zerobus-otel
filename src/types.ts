@@ -4,12 +4,32 @@ export type AuthMethod = "u2m" | "m2m" | "pat";
 
 export type Signal = "logs" | "metrics" | "traces";
 
-export type SettingsTarget = "global" | "project";
+export type SettingsTarget = "global" | "project" | "local";
+
+export type TableSetupMode = "create" | "existing";
+
+export type ExperimentRetryAction = "retry" | "skip";
 
 export interface TelemetryContentOptions {
   logUserPrompts: boolean;
   logToolDetails: boolean;
   logToolContent: boolean;
+}
+
+export interface UcTablePrefix {
+  catalogName: string;
+  schemaName: string;
+  tablePrefix: string;
+}
+
+export type SignalTableNames = Partial<Record<Signal, string>>;
+
+export interface TableSetupConfig {
+  mode: TableSetupMode;
+  location: UcTablePrefix;
+  resolvedTableNames?: SignalTableNames;
+  experimentName?: string;
+  experimentId?: string;
 }
 
 export interface UserConfig {
@@ -20,7 +40,7 @@ export interface UserConfig {
   profileName?: string;
   pat?: string;
   enabledSignals: Signal[];
-  tablePrefix: string;
+  tableSetup: TableSetupConfig;
   settingsTarget: SettingsTarget;
   contentOptions: TelemetryContentOptions;
 }

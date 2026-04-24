@@ -5,8 +5,11 @@ import { checkbox, confirm, input, password, select } from "@inquirer/prompts";
 import { type Locale, setLocale, t } from "./i18n.js";
 import type {
   AuthMethod,
+  ExperimentRetryAction,
   SettingsTarget,
   Signal,
+  TableSetupConfig,
+  TableSetupMode,
   TargetTool,
   TelemetryContentOptions,
   UserConfig,
@@ -14,7 +17,7 @@ import type {
 
 export async function promptLocale(): Promise<Locale> {
   return select({
-    message: "Language / 言語:",
+    message: "Which language would you like to use? / どの言語を使用しますか?",
     choices: [
       { name: "English", value: "en" as const },
       { name: "日本語", value: "ja" as const },
@@ -32,7 +35,7 @@ function normalizeUrl(value: string): string {
 
 async function promptWorkspaceUrl(): Promise<string> {
   const url = await input({
-    message: "Databricks workspace URL:",
+    message: "What is your Databricks workspace URL?",
     validate: (value) => {
       const normalized = normalizeUrl(value);
       try {
@@ -189,18 +192,85 @@ async function promptSignals(): Promise<Signal[]> {
   return signals;
 }
 
-async function promptTablePrefix(): Promise<string> {
-  return input({
-    message: t().tablePrefixPrompt,
-    default: "main.default.claude_",
+function parseUcSchema(
+  value: string,
+): { catalogName: string; schemaName: string } | null {
+  const parts = value
+    .trim()
+    .split(".")
+    .map((part) => part.trim());
+  if (parts.length !== 2 || parts.some((part) => part.length === 0)) {
+    return null;
+  }
+  const [catalogName, schemaName] = parts;
+  if (!catalogName || !schemaName) {
+    return null;
+  }
+  return { catalogName, schemaName };
+}
+
+async function promptTableSetupMode(): Promise<TableSetupMode> {
+  return select({
+    message: t().selectTableSetupMode,
+    choices: [
+      {
+        name: t().tableSetupCreate,
+        value: "create" as const,
+      },
+      {
+        name: t().tableSetupExisting,
+        value: "existing" as const,
+      },
+    ],
+  });
+}
+
+async function promptTableSetup(): Promise<TableSetupConfig> {
+  const mode = await promptTableSetupMode();
+  const schema = await input({
+    message: t().tableSchemaPrompt,
+    default: "main.default",
     validate: (value) => {
-      const dots = (value.match(/\./g) || []).length;
-      if (dots < 2) {
-        return t().tablePrefixValidation;
+      if (!parseUcSchema(value)) {
+        return t().tableSchemaValidation;
       }
       return true;
     },
   });
+  const parsedSchema = parseUcSchema(schema);
+  if (!parsedSchema) {
+    throw new Error(t().tableSchemaValidation);
+  }
+
+  const rawTablePrefix = await input({
+    message: t().tablePrefixPrompt,
+    default: "claude",
+    validate: (value) => {
+      const trimmed = value.trim();
+      if (!trimmed) return t().tablePrefixValidation;
+      if (trimmed.includes(".")) return t().tablePrefixValidation;
+      if (trimmed.endsWith("_")) return t().tablePrefixValidation;
+      return true;
+    },
+  });
+  const tablePrefix = rawTablePrefix.trim();
+  const tableSetup: TableSetupConfig = {
+    mode,
+    location: {
+      catalogName: parsedSchema.catalogName,
+      schemaName: parsedSchema.schemaName,
+      tablePrefix,
+    },
+  };
+
+  if (mode === "create") {
+    const experimentName = await promptExperimentName();
+    if (experimentName.trim()) {
+      tableSetup.experimentName = experimentName.trim();
+    }
+  }
+
+  return tableSetup;
 }
 
 async function promptSettingsTarget(): Promise<SettingsTarget> {
@@ -214,6 +284,32 @@ async function promptSettingsTarget(): Promise<SettingsTarget> {
       {
         name: "Project (.claude/settings.json)",
         value: "project" as const,
+      },
+      {
+        name: "Local (.claude/settings.local.json)",
+        value: "local" as const,
+      },
+    ],
+  });
+}
+
+export async function promptExperimentName(): Promise<string> {
+  return input({
+    message: t().experimentNamePrompt,
+  });
+}
+
+export async function promptExperimentRetryAction(): Promise<ExperimentRetryAction> {
+  return select({
+    message: t().experimentRetryPrompt,
+    choices: [
+      {
+        name: t().experimentRetryWithAnotherName,
+        value: "retry" as const,
+      },
+      {
+        name: t().experimentSkipLink,
+        value: "skip" as const,
       },
     ],
   });
@@ -264,19 +360,20 @@ export async function collectUserConfig(): Promise<UserConfig> {
     const profiles = await parseDatabricksCfg();
     profileName = await promptProfileName(profiles);
     workspaceUrl = await resolveWorkspaceUrlFromProfile(profileName, profiles);
-    scriptLocation = await promptScriptLocation();
   } else if (authMethod === "m2m") {
     workspaceUrl = await promptWorkspaceUrl();
-    scriptLocation = await promptScriptLocation();
   } else {
     workspaceUrl = await promptWorkspaceUrl();
     pat = await promptPat();
   }
 
-  const enabledSignals = await promptSignals();
-  const tablePrefix = await promptTablePrefix();
+  const tableSetup = await promptTableSetup();
   const settingsTarget = await promptSettingsTarget();
+  const enabledSignals = await promptSignals();
   const contentOptions = await promptContentOptions();
+  if (authMethod !== "pat") {
+    scriptLocation = await promptScriptLocation();
+  }
 
   return {
     targetTool,
@@ -286,7 +383,7 @@ export async function collectUserConfig(): Promise<UserConfig> {
     profileName,
     pat,
     enabledSignals,
-    tablePrefix,
+    tableSetup,
     settingsTarget,
     contentOptions,
   };
