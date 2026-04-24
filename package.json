@@ -1,7 +1,7 @@
 {
   "name": "setup-zerobus-otel",
-  "version": "0.2.0",
-  "description": "Interactive CLI to configure OpenTelemetry sending to Databricks (zerobus) for Claude Code",
+  "version": "0.3.0",
+  "description": "Interactive CLI to configure OpenTelemetry sending to Databricks (zerobus) for Claude Code and Codex",
   "type": "module",
   "bin": {
     "setup-zerobus-otel": "./dist/index.js"
@@ -12,6 +12,7 @@
   "scripts": {
     "build": "tsup",
     "dev": "tsup --watch",
+    "test": "bun test",
     "typecheck": "tsc --noEmit",
     "format": "biome format --write .",
     "lint": "biome lint .",
@@ -22,7 +23,8 @@
     "node": ">=18"
   },
   "dependencies": {
-    "@inquirer/prompts": "^7.0.0"
+    "@inquirer/prompts": "^7.0.0",
+    "smol-toml": "^1.4.2"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.4.12",

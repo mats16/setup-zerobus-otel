@@ -3,6 +3,7 @@ import path from "node:path";
 import { generateTokenScript } from "./script-generator.js";
 import { fallbackTableName } from "./table-location.js";
 import type {
+  CodexExporter,
   GeneratedConfig,
   SettingsAdditions,
   Signal,
@@ -20,6 +21,8 @@ const SIGNAL_ENDPOINT_PATH: Record<Signal, string> = {
   metrics: "metrics",
   traces: "traces",
 };
+
+const ALL_SIGNALS: Signal[] = ["logs", "metrics", "traces"];
 
 export function expandTilde(p: string): string {
   if (p.startsWith("~/")) {
@@ -46,7 +49,59 @@ function buildHeaders(tableName: string, pat?: string): string {
   return parts.join(",");
 }
 
+function buildCodexHeaders(
+  tableName: string,
+  pat: string,
+): Record<string, string> {
+  return {
+    Authorization: `Bearer ${pat}`,
+    "content-type": "application/x-protobuf",
+    "X-Databricks-UC-Table-Name": tableName,
+  };
+}
+
+function buildCodexExporter(config: UserConfig, signal: Signal): CodexExporter {
+  if (!config.enabledSignals.includes(signal)) {
+    return "none";
+  }
+  if (!config.pat) {
+    throw new Error("pat is required for codex auth");
+  }
+
+  const tableName =
+    config.tableSetup.resolvedTableNames?.[signal] ??
+    fallbackTableName(config.tableSetup.location, signal);
+
+  return {
+    "otlp-http": {
+      endpoint: `${config.workspaceUrl}/api/2.0/otel/v1/${SIGNAL_ENDPOINT_PATH[signal]}`,
+      protocol: "binary",
+      headers: buildCodexHeaders(tableName, config.pat),
+    },
+  };
+}
+
+function generateCodexConfig(config: UserConfig): GeneratedConfig {
+  return {
+    settingsAdditions: { env: {} },
+    codexConfig: {
+      otel: {
+        environment: "dev",
+        log_user_prompt: config.contentOptions.logUserPrompts,
+        exporter: buildCodexExporter(config, "logs"),
+        trace_exporter: buildCodexExporter(config, "traces"),
+        metrics_exporter: buildCodexExporter(config, "metrics"),
+      },
+    },
+    tokenScript: null,
+  };
+}
+
 export function generateConfig(config: UserConfig): GeneratedConfig {
+  if (config.targetTool === "codex") {
+    return generateCodexConfig(config);
+  }
+
   const {
     workspaceUrl,
     authMethod,
@@ -63,9 +118,7 @@ export function generateConfig(config: UserConfig): GeneratedConfig {
   env.CLAUDE_CODE_ENABLE_TELEMETRY = "1";
   env.CLAUDE_CODE_ENHANCED_TELEMETRY_BETA = "1";
 
-  const allSignals: Signal[] = ["logs", "metrics", "traces"];
-
-  for (const signal of allSignals) {
+  for (const signal of ALL_SIGNALS) {
     const key = SIGNAL_ENV_KEY[signal];
     const enabled = enabledSignals.includes(signal);
 

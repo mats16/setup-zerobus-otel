@@ -22,18 +22,40 @@ function printBanner(): void {
   console.log();
 }
 
+function previewTargetPath(userConfig: UserConfig): string {
+  if (userConfig.targetTool === "codex") {
+    return userConfig.settingsTarget === "global"
+      ? "~/.codex/config.toml"
+      : ".codex/config.toml";
+  }
+  return userConfig.settingsTarget === "global"
+    ? "~/.claude/settings.json"
+    : userConfig.settingsTarget === "local"
+      ? ".claude/settings.local.json"
+      : ".claude/settings.json";
+}
+
+function maskSecrets(value: unknown): unknown {
+  if (typeof value === "string") {
+    return value.replace(/Bearer [^,\s"]+/g, "Bearer ***");
+  }
+  if (Array.isArray(value)) {
+    return value.map(maskSecrets);
+  }
+  if (typeof value === "object" && value !== null) {
+    return Object.fromEntries(
+      Object.entries(value).map(([key, entry]) => [key, maskSecrets(entry)]),
+    );
+  }
+  return value;
+}
+
 function printPreview(config: GeneratedConfig, userConfig: UserConfig): void {
   console.log();
   console.log(t().previewHeader);
   console.log();
 
-  const target =
-    userConfig.settingsTarget === "global"
-      ? "~/.claude/settings.json"
-      : userConfig.settingsTarget === "local"
-        ? ".claude/settings.local.json"
-        : ".claude/settings.json";
-  console.log(`  ${t().previewTarget}: ${target}`);
+  console.log(`  ${t().previewTarget}: ${previewTargetPath(userConfig)}`);
   const tableSetup =
     userConfig.tableSetup.mode === "create"
       ? t().previewTableCreate
@@ -41,24 +63,26 @@ function printPreview(config: GeneratedConfig, userConfig: UserConfig): void {
   console.log(`  ${t().previewTableSetup}: ${tableSetup}`);
   console.log();
 
-  console.log("  env:");
-  for (const [key, value] of Object.entries(config.settingsAdditions.env)) {
-    if (key.includes("HEADERS") && value.includes("Authorization=Bearer ")) {
-      const masked = value.replace(
-        /Authorization=Bearer [^,]+/,
-        "Authorization=Bearer ***",
-      );
-      console.log(`    ${key}: ${masked}`);
-    } else {
-      console.log(`    ${key}: ${value}`);
+  if (userConfig.targetTool === "codex") {
+    console.log("  otel:");
+    const masked = maskSecrets(config.codexConfig?.otel ?? {});
+    const preview = JSON.stringify(masked, null, 2)
+      .split("\n")
+      .map((line) => `    ${line}`)
+      .join("\n");
+    console.log(preview);
+  } else {
+    console.log("  env:");
+    for (const [key, value] of Object.entries(config.settingsAdditions.env)) {
+      console.log(`    ${key}: ${maskSecrets(value)}`);
     }
-  }
 
-  if (config.settingsAdditions.otelHeadersHelper) {
-    console.log();
-    console.log(
-      `  otelHeadersHelper: ${config.settingsAdditions.otelHeadersHelper}`,
-    );
+    if (config.settingsAdditions.otelHeadersHelper) {
+      console.log();
+      console.log(
+        `  otelHeadersHelper: ${config.settingsAdditions.otelHeadersHelper}`,
+      );
+    }
   }
 
   if (config.tokenScript) {
@@ -172,7 +196,11 @@ async function main(): Promise<void> {
 
   await prepareTables(userConfig);
   generatedConfig = generateConfig(userConfig);
-  const result = await applyConfig(generatedConfig, userConfig.settingsTarget);
+  const result = await applyConfig(
+    generatedConfig,
+    userConfig.settingsTarget,
+    userConfig.targetTool,
+  );
   printSummary(result, userConfig);
 }
 

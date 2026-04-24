@@ -5,10 +5,14 @@ export interface Messages {
   urlMustBeHttps: string;
   enterValidHostname: string;
   enterValidUrl: string;
+  selectTargetTool: string;
+  targetClaudeCode: string;
+  targetCodex: string;
   selectAuthMethod: string;
   authU2m: string;
   authM2m: string;
   authPat: string;
+  codexPatOnlyNotice: string;
   noProfileFound: string;
   selectProfile: string;
   enterProfileName: string;
@@ -33,7 +37,11 @@ export interface Messages {
   experimentRetryWithAnotherName: string;
   experimentSkipLink: string;
   settingsTargetPrompt: string;
+  codexSettingsTargetPrompt: string;
+  codexSettingsGlobal: string;
+  codexSettingsProject: string;
   selectContentOptions: string;
+  codexLogUserPromptPrompt: string;
   contentUserPrompts: string;
   contentToolDetails: string;
   contentToolContent: string;
@@ -66,6 +74,7 @@ export interface Messages {
 
   // file-writer
   settingsReadError: (path: string, message: string) => string;
+  tomlReadError: (path: string, message: string) => string;
 
   // databricks-api
   missingProfileName: string;
@@ -82,10 +91,15 @@ const ja: Messages = {
   urlMustBeHttps: "URL は https である必要があります",
   enterValidHostname: "有効なホスト名を入力してください",
   enterValidUrl: "有効な URL を入力してください",
+  selectTargetTool: "どのツールを設定しますか?",
+  targetClaudeCode: "Claude Code",
+  targetCodex: "Codex",
   selectAuthMethod: "どの authorization method を使用しますか?",
   authU2m: "OAuth for users (U2M) — Databricks CLI 必須",
   authM2m: "OAuth for service principals (M2M) — client_id + client_secret",
   authPat: "Personal Access Token (PAT) — 静的トークン",
+  codexPatOnlyNotice:
+    "  Codex の直接設定では PAT のみ対応します（U2M/M2M の動的認証ヘルパーは未対応）。",
   noProfileFound: "  ~/.databrickscfg に対象プロファイルが見つかりません。",
   selectProfile: "どの Databricks CLI プロファイルを使用しますか?",
   enterProfileName: "Databricks CLI プロファイル名は何ですか?",
@@ -113,7 +127,13 @@ const ja: Messages = {
   experimentRetryWithAnotherName: "別の Experiment 名で再試行",
   experimentSkipLink: "Experiment 紐づけをスキップ",
   settingsTargetPrompt: "Claude Code のどの設定スコープに書き込みますか?",
+  codexSettingsTargetPrompt: "Codex のどの設定スコープに書き込みますか?",
+  codexSettingsGlobal: "Global (~/.codex/config.toml)",
+  codexSettingsProject:
+    "Project (.codex/config.toml) — Codex 側で trusted project のときのみ有効",
   selectContentOptions: "テレメトリには何を含めますか?",
+  codexLogUserPromptPrompt:
+    "Codex の OTEL logs にユーザープロンプト本文を含めますか?",
   contentUserPrompts: "ユーザープロンプト",
   contentToolDetails: "ツール実行詳細",
   contentToolContent: "ツール入出力内容",
@@ -150,6 +170,8 @@ const ja: Messages = {
 
   settingsReadError: (p, message) =>
     `settings.json の読み込みに失敗しました (${p}): ${message}`,
+  tomlReadError: (p, message) =>
+    `config.toml の読み込みに失敗しました (${p}): ${message}`,
 
   missingProfileName: "Databricks CLI プロファイル名がありません",
   missingPat: "Personal Access Token がありません",
@@ -169,10 +191,15 @@ const en: Messages = {
   urlMustBeHttps: "URL must use https",
   enterValidHostname: "Please enter a valid hostname",
   enterValidUrl: "Please enter a valid URL",
+  selectTargetTool: "Which tool would you like to configure?",
+  targetClaudeCode: "Claude Code",
+  targetCodex: "Codex",
   selectAuthMethod: "Which authorization method would you like to use?",
   authU2m: "OAuth for users (U2M) — requires Databricks CLI",
   authM2m: "OAuth for service principals (M2M) — client_id + client_secret",
   authPat: "Personal Access Token (PAT) — static token",
+  codexPatOnlyNotice:
+    "  Codex direct configuration supports PAT only; U2M/M2M dynamic auth helpers are not supported.",
   noProfileFound: "  No matching profiles found in ~/.databrickscfg.",
   selectProfile: "Which Databricks CLI profile would you like to use?",
   enterProfileName: "What is your Databricks CLI profile named?",
@@ -200,7 +227,12 @@ const en: Messages = {
   experimentRetryWithAnotherName: "Retry with another name",
   experimentSkipLink: "Skip Experiment linking",
   settingsTargetPrompt: "Which Claude Code settings scope should be updated?",
+  codexSettingsTargetPrompt: "Which Codex settings scope should be updated?",
+  codexSettingsGlobal: "Global (~/.codex/config.toml)",
+  codexSettingsProject:
+    "Project (.codex/config.toml) — only active for trusted Codex projects",
   selectContentOptions: "What should telemetry include?",
+  codexLogUserPromptPrompt: "Include raw user prompts in Codex OTEL logs?",
   contentUserPrompts: "User prompts",
   contentToolDetails: "Tool execution details",
   contentToolContent: "Tool input/output content",
@@ -236,6 +268,8 @@ const en: Messages = {
 
   settingsReadError: (p, message) =>
     `Failed to read settings.json (${p}): ${message}`,
+  tomlReadError: (p, message) =>
+    `Failed to read config.toml (${p}): ${message}`,
 
   missingProfileName: "Databricks CLI profile name is missing",
   missingPat: "Personal Access Token is missing",

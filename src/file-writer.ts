@@ -1,15 +1,18 @@
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
+import { parse, stringify } from "smol-toml";
 import { t } from "./i18n.js";
 import type {
+  CodexConfigAdditions,
   GeneratedConfig,
   GeneratedScript,
   SettingsAdditions,
   SettingsTarget,
+  TargetTool,
 } from "./types.js";
 
-function resolveSettingsPath(target: SettingsTarget): string {
+function resolveClaudeSettingsPath(target: SettingsTarget): string {
   if (target === "global") {
     return path.join(os.homedir(), ".claude", "settings.json");
   }
@@ -17,6 +20,13 @@ function resolveSettingsPath(target: SettingsTarget): string {
     return path.join(process.cwd(), ".claude", "settings.local.json");
   }
   return path.join(process.cwd(), ".claude", "settings.json");
+}
+
+function resolveCodexSettingsPath(target: SettingsTarget): string {
+  if (target === "global") {
+    return path.join(os.homedir(), ".codex", "config.toml");
+  }
+  return path.join(process.cwd(), ".codex", "config.toml");
 }
 
 async function readExistingSettings(
@@ -30,6 +40,20 @@ async function readExistingSettings(
       return {};
     }
     throw new Error(t().settingsReadError(filePath, (err as Error).message));
+  }
+}
+
+async function readExistingToml(
+  filePath: string,
+): Promise<Record<string, unknown>> {
+  try {
+    const content = await fs.readFile(filePath, "utf-8");
+    return parse(content) as Record<string, unknown>;
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code === "ENOENT") {
+      return {};
+    }
+    throw new Error(t().tomlReadError(filePath, (err as Error).message));
   }
 }
 
@@ -73,6 +97,18 @@ function mergeSettings(
   return deepMerge(existing, toMerge);
 }
 
+// Codex otel section is generated atomically — replace rather than deep-merge
+// so stale sub-keys from a previous run are not carried over.
+function mergeCodexConfig(
+  existing: Record<string, unknown>,
+  additions: CodexConfigAdditions,
+): Record<string, unknown> {
+  return {
+    ...existing,
+    otel: additions.otel,
+  };
+}
+
 async function writeSettings(
   filePath: string,
   settings: Record<string, unknown>,
@@ -85,6 +121,14 @@ async function writeSettings(
   );
 }
 
+async function writeToml(
+  filePath: string,
+  settings: Record<string, unknown>,
+): Promise<void> {
+  await fs.mkdir(path.dirname(filePath), { recursive: true });
+  await fs.writeFile(filePath, stringify(settings), "utf-8");
+}
+
 async function writeScript(script: GeneratedScript): Promise<void> {
   await fs.mkdir(path.dirname(script.filePath), { recursive: true });
   await fs.writeFile(script.filePath, script.content, "utf-8");
@@ -94,8 +138,20 @@ async function writeScript(script: GeneratedScript): Promise<void> {
 export async function applyConfig(
   config: GeneratedConfig,
   settingsTarget: SettingsTarget,
+  targetTool: TargetTool,
 ): Promise<{ settingsPath: string }> {
-  const settingsPath = resolveSettingsPath(settingsTarget);
+  if (targetTool === "codex") {
+    if (!config.codexConfig) {
+      throw new Error("codexConfig is required for Codex");
+    }
+    const settingsPath = resolveCodexSettingsPath(settingsTarget);
+    const existing = await readExistingToml(settingsPath);
+    const merged = mergeCodexConfig(existing, config.codexConfig);
+    await writeToml(settingsPath, merged);
+    return { settingsPath };
+  }
+
+  const settingsPath = resolveClaudeSettingsPath(settingsTarget);
   const existing = await readExistingSettings(settingsPath);
   const merged = mergeSettings(existing, config.settingsAdditions);
 
