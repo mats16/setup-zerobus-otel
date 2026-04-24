@@ -51,17 +51,6 @@ function buildHeaders(tableName: string, pat?: string): string {
   return parts.join(",");
 }
 
-function resolveScriptPath(
-  scriptLocation: string,
-  authMethod: "u2m" | "m2m",
-): string {
-  const fileName =
-    authMethod === "u2m"
-      ? "gen_otel_headers_u2m.js"
-      : "gen_otel_headers_m2m.js";
-  return path.join(expandTilde(scriptLocation), fileName);
-}
-
 export function generateConfig(config: UserConfig): GeneratedConfig {
   const {
     workspaceUrl,
@@ -118,13 +107,11 @@ export function generateConfig(config: UserConfig): GeneratedConfig {
   env.OTEL_LOG_TOOL_CONTENT = contentOptions.logToolContent ? "1" : "0";
 
   const settingsAdditions: SettingsAdditions = { env };
-
-  if (authMethod === "u2m" || authMethod === "m2m") {
-    const scriptAbsPath = resolveScriptPath(config.scriptLocation, authMethod);
-    settingsAdditions.otelHeadersHelper = collapseTilde(scriptAbsPath);
-  }
-
   const tokenScript = generateTokenScript(config);
+
+  if (tokenScript) {
+    settingsAdditions.otelHeadersHelper = collapseTilde(tokenScript.filePath);
+  }
 
   return { settingsAdditions, tokenScript };
 }

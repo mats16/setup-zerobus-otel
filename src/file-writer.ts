@@ -95,13 +95,13 @@ export async function applyConfig(
   const settingsPath = resolveSettingsPath(settingsTarget);
   const existing = await readExistingSettings(settingsPath);
   const merged = mergeSettings(existing, config.settingsAdditions);
-  await writeSettings(settingsPath, merged);
 
-  let scriptPath: string | null = null;
+  const writes: Promise<void>[] = [writeSettings(settingsPath, merged)];
+  const scriptPath = config.tokenScript?.filePath ?? null;
   if (config.tokenScript) {
-    await writeScript(config.tokenScript);
-    scriptPath = config.tokenScript.filePath;
+    writes.push(writeScript(config.tokenScript));
   }
+  await Promise.all(writes);
 
   return { settingsPath, scriptPath };
 }

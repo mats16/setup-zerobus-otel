@@ -106,5 +106,5 @@ export function generateTokenScript(
       ? generateU2mScript(config.profileName!)
       : generateM2mScript();
 
-  return { filePath, content, fileName };
+  return { filePath, content };
 }

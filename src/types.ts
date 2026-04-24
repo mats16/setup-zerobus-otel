@@ -38,5 +38,4 @@ export interface SettingsAdditions {
 export interface GeneratedScript {
   filePath: string;
   content: string;
-  fileName: string;
 }

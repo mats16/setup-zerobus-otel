@@ -157,10 +157,6 @@ export function setLocale(locale: Locale): void {
   currentLocale = locale;
 }
 
-export function getLocale(): Locale {
-  return currentLocale;
-}
-
 export function t(): Messages {
   return locales[currentLocale];
 }

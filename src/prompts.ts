@@ -122,10 +122,7 @@ async function parseDatabricksCfg(): Promise<Map<string, ProfileInfo>> {
     if (authType && authType !== "databricks-cli") continue;
     const rawHost = kv.host;
     if (!rawHost) continue;
-    let host = rawHost.replace(/\/+$/, "");
-    if (!host.startsWith("https://") && !host.startsWith("http://")) {
-      host = `https://${host}`;
-    }
+    const host = normalizeUrl(rawHost);
     profiles.set(name, { host, authType });
   }
   return profiles;
