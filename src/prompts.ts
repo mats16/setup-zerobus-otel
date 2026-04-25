@@ -5,6 +5,7 @@ import { checkbox, confirm, input, password, select } from "@inquirer/prompts";
 import { type Locale, setLocale, t } from "./i18n.js";
 import type {
   AuthMethod,
+  Destination,
   ExperimentRetryAction,
   SettingsTarget,
   Signal,
@@ -38,6 +39,54 @@ async function promptTargetTool(): Promise<TargetTool> {
         value: "codex" as const,
       },
     ],
+  });
+}
+
+async function promptDestination(): Promise<Destination> {
+  return select({
+    message: t().selectDestination,
+    choices: [
+      {
+        name: t().destinationDatabricks,
+        value: "databricks" as const,
+      },
+      {
+        name: t().destinationCustom,
+        value: "custom" as const,
+      },
+    ],
+  });
+}
+
+async function promptCustomEndpoint(): Promise<string> {
+  const url = await input({
+    message: t().customEndpointPrompt,
+    validate: (value) => {
+      const normalized = normalizeUrl(value);
+      try {
+        const parsed = new URL(normalized);
+        if (parsed.protocol !== "https:" && parsed.protocol !== "http:") {
+          return t().enterValidUrl;
+        }
+        if (!parsed.hostname) {
+          return t().enterValidHostname;
+        }
+      } catch {
+        return t().enterValidUrl;
+      }
+      return true;
+    },
+  });
+  return normalizeUrl(url);
+}
+
+async function promptCustomToken(): Promise<string> {
+  return password({
+    message: t().customTokenPrompt,
+    validate: (value) => {
+      if (!value) return t().tokenRequired;
+      return true;
+    },
   });
 }
 
@@ -397,6 +446,29 @@ export async function collectUserConfig(): Promise<UserConfig> {
   setLocale(locale);
 
   const targetTool = await promptTargetTool();
+  const destination = await promptDestination();
+
+  if (destination === "custom") {
+    const endpoint = await promptCustomEndpoint();
+    const authorizationToken = await promptCustomToken();
+    const settingsTarget = await promptSettingsTarget(targetTool);
+    const enabledSignals = await promptSignals();
+    const contentOptions =
+      targetTool === "codex"
+        ? await promptCodexContentOptions()
+        : await promptContentOptions();
+
+    return {
+      destination: "custom",
+      targetTool,
+      endpoint,
+      authorizationToken,
+      enabledSignals,
+      settingsTarget,
+      contentOptions,
+    };
+  }
+
   const authMethod = targetTool === "codex" ? "pat" : await promptAuthMethod();
   if (targetTool === "codex") {
     console.log(t().codexPatOnlyNotice);
@@ -430,6 +502,7 @@ export async function collectUserConfig(): Promise<UserConfig> {
   }
 
   return {
+    destination: "databricks",
     targetTool,
     workspaceUrl,
     authMethod,

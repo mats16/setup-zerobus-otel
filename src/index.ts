@@ -13,12 +13,16 @@ import {
   promptExperimentName,
   promptExperimentRetryAction,
 } from "./prompts.js";
-import type { GeneratedConfig, UserConfig } from "./types.js";
+import type {
+  DatabricksUserConfig,
+  GeneratedConfig,
+  UserConfig,
+} from "./types.js";
 
 function printBanner(): void {
   console.log();
-  console.log("  setup-zerobus-otel");
-  console.log("  Configure OpenTelemetry via Zerobus (Databricks)");
+  console.log("  setup-agent-otel");
+  console.log("  Configure OpenTelemetry for Claude Code or Codex");
   console.log();
 }
 
@@ -56,11 +60,20 @@ function printPreview(config: GeneratedConfig, userConfig: UserConfig): void {
   console.log();
 
   console.log(`  ${t().previewTarget}: ${previewTargetPath(userConfig)}`);
-  const tableSetup =
-    userConfig.tableSetup.mode === "create"
-      ? t().previewTableCreate
-      : t().previewTableExisting;
-  console.log(`  ${t().previewTableSetup}: ${tableSetup}`);
+  const destinationLabel =
+    userConfig.destination === "custom"
+      ? t().destinationCustom
+      : t().destinationDatabricks;
+  console.log(`  ${t().previewDestination}: ${destinationLabel}`);
+  if (userConfig.destination === "custom") {
+    console.log(`  ${t().previewEndpoint}: ${userConfig.endpoint}`);
+  } else {
+    const tableSetup =
+      userConfig.tableSetup.mode === "create"
+        ? t().previewTableCreate
+        : t().previewTableExisting;
+    console.log(`  ${t().previewTableSetup}: ${tableSetup}`);
+  }
   console.log();
 
   if (userConfig.targetTool === "codex") {
@@ -96,6 +109,9 @@ function printPreview(config: GeneratedConfig, userConfig: UserConfig): void {
 }
 
 async function prepareTables(userConfig: UserConfig): Promise<void> {
+  if (userConfig.destination !== "databricks") {
+    return;
+  }
   if (userConfig.tableSetup.mode !== "create") {
     return;
   }
@@ -114,7 +130,9 @@ async function prepareTables(userConfig: UserConfig): Promise<void> {
   await linkExperimentWithRetry(userConfig);
 }
 
-async function linkExperimentWithRetry(userConfig: UserConfig): Promise<void> {
+async function linkExperimentWithRetry(
+  userConfig: DatabricksUserConfig,
+): Promise<void> {
   let experimentName = userConfig.tableSetup.experimentName;
 
   while (experimentName) {
@@ -161,6 +179,10 @@ function printSummary(
   console.log(`  Settings: ${result.settingsPath}`);
   console.log(`  Signals:  ${userConfig.enabledSignals.join(", ")}`);
   console.log();
+
+  if (userConfig.destination !== "databricks") {
+    return;
+  }
 
   if (
     userConfig.authMethod === "u2m" &&

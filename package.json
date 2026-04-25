@@ -1,10 +1,10 @@
 {
-  "name": "setup-zerobus-otel",
+  "name": "setup-agent-otel",
   "version": "0.3.1",
-  "description": "Interactive CLI to configure OpenTelemetry sending to Databricks (zerobus) for Claude Code and Codex",
+  "description": "Interactive CLI to configure OpenTelemetry sending from Claude Code or Codex to Databricks Zerobus Ingest or any OTLP/HTTP backend",
   "type": "module",
   "bin": {
-    "setup-zerobus-otel": "./dist/index.js"
+    "setup-agent-otel": "./dist/index.js"
   },
   "files": [
     "dist"

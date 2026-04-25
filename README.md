@@ -1,6 +1,6 @@
-# setup-zerobus-otel
+# setup-agent-otel
 
-Interactive setup CLI for sending OpenTelemetry output from Claude Code or Codex to the Databricks Zerobus OTEL endpoint.
+Interactive setup CLI for sending OpenTelemetry output from Claude Code or Codex to Databricks Zerobus Ingest, or to any custom OTLP/HTTP backend.
 
 This package is designed to be run directly with `npx`, `pnpx`, or `bunx`. A global install is not required.
 
@@ -9,30 +9,49 @@ Japanese README: [README_ja.md](./README_ja.md)
 ## Quick Start
 
 ```bash
-npx setup-zerobus-otel
+npx setup-agent-otel
 ```
 
 With pnpm or Bun:
 
 ```bash
-pnpx setup-zerobus-otel
-bunx setup-zerobus-otel
+pnpx setup-agent-otel
+bunx setup-agent-otel
 ```
 
-The CLI walks you through your Databricks workspace, authentication method, enabled telemetry signals, destination tables, and the Claude Code or Codex settings scope. Before writing anything, it shows a preview and asks for confirmation.
+The CLI walks you through the destination, authentication, enabled telemetry signals, and the Claude Code or Codex settings scope. Before writing anything, it shows a preview and asks for confirmation.
 
 ## What This Does
 
 - Generates OTEL configuration for Claude Code or Codex
-- Configures Logs / Metrics / Traces to send to the Databricks Zerobus OTEL endpoint
-- Lets you select existing Unity Catalog tables or create new destination tables
-- Supports U2M / M2M / PAT authentication for Claude Code
-- Supports direct PAT authentication for Codex
+- Sends Logs / Metrics / Traces to one of two destinations:
+  - **Databricks (Zerobus Ingest)**: full Unity Catalog table setup with optional MLflow Experiment linking
+  - **Custom (OTLP/HTTP)**: any OTLP/HTTP endpoint with a static authorization token
+- Supports U2M / M2M / PAT authentication for Claude Code with Databricks
+- Supports direct PAT authentication for Codex with Databricks
 - Preserves existing settings and updates only the relevant OTEL keys
+
+## Destinations
+
+### Databricks (Zerobus Ingest)
+
+The full Databricks flow. The CLI asks for your workspace URL, authentication method, Unity Catalog `catalog.schema`, table prefix, and optionally creates the schema, trace location, and MLflow Experiment via Databricks APIs.
+
+### Custom (OTLP/HTTP)
+
+A minimal flow for any OTLP/HTTP-compatible backend. The CLI asks for:
+
+- The OTLP base URL (e.g. `https://otel.example.com`). Per-signal endpoints become `<base>/v1/logs`, `<base>/v1/metrics`, `<base>/v1/traces`.
+- A static authorization token, sent as `Authorization: Bearer <token>`.
+
+No Databricks-specific headers, schemas, tables, or MLflow Experiments are created.
 
 ## Requirements
 
 - Node.js 18 or later
+
+For the **Databricks** destination:
+
 - A Databricks workspace
 - Permissions for the target Unity Catalog catalog / schema / tables
 - If creating tables from the CLI: permissions to create or get the schema, trace location, and MLflow Experiment through Databricks APIs
@@ -46,6 +65,10 @@ For Claude Code with M2M authentication:
 
 - `DATABRICKS_CLIENT_ID`
 - `DATABRICKS_CLIENT_SECRET`
+
+For the **Custom** destination:
+
+- An OTLP/HTTP endpoint and a bearer token
 
 ## Supported Targets
 
@@ -61,13 +84,15 @@ You can choose the target settings scope during setup.
 
 Existing settings such as `hooks`, `permissions`, and `mcpServers` are preserved. The CLI updates only the OTEL-related `env` and `otelHeadersHelper` keys.
 
-Supported authentication methods:
+Authentication methods (Databricks destination only):
 
 - OAuth for users (U2M): dynamically gets tokens from a Databricks CLI profile
 - OAuth for service principals (M2M): dynamically gets tokens from `DATABRICKS_CLIENT_ID` / `DATABRICKS_CLIENT_SECRET`
 - Personal Access Token (PAT): writes the token directly into OTEL headers
 
 For U2M and M2M, the CLI generates a token helper script and configures it as Claude Code's `otelHeadersHelper`.
+
+The Custom destination always uses the static bearer token you provide; no helper script is generated.
 
 ### Codex
 
@@ -78,11 +103,11 @@ You can choose the target settings scope during setup.
 - Global: `~/.codex/config.toml`
 - Project: `.codex/config.toml`
 
-Codex currently supports direct PAT authentication only.
+Codex with the Databricks destination supports direct PAT authentication only. With the Custom destination, Codex uses the bearer token you provide.
 
 ## Databricks Tables
 
-The CLI asks for a Unity Catalog `catalog.schema` and a table prefix to use as the Databricks OTEL destination.
+When using the Databricks destination, the CLI asks for a Unity Catalog `catalog.schema` and a table prefix.
 
 Example:
 
@@ -127,25 +152,25 @@ Telemetry can contain sensitive information. Enable only the fields that match y
 Run the CLI:
 
 ```bash
-npx setup-zerobus-otel
+npx setup-agent-otel
 ```
 
 Force the latest published package:
 
 ```bash
-npx setup-zerobus-otel@latest
+npx setup-agent-otel@latest
 ```
 
 pnpm:
 
 ```bash
-pnpx setup-zerobus-otel
+pnpx setup-agent-otel
 ```
 
 Bun:
 
 ```bash
-bunx setup-zerobus-otel
+bunx setup-agent-otel
 ```
 
 ## Development

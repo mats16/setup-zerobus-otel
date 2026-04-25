@@ -5,7 +5,11 @@ import { afterEach, describe, expect, test } from "bun:test";
 import { parse } from "smol-toml";
 import { generateConfig } from "../src/config-generator.ts";
 import { applyConfig } from "../src/file-writer.ts";
-import type { CodexOtelConfig, UserConfig } from "../src/types.ts";
+import type {
+  CodexOtelConfig,
+  CustomUserConfig,
+  DatabricksUserConfig,
+} from "../src/types.ts";
 
 const tempDirs: string[] = [];
 
@@ -15,8 +19,11 @@ afterEach(async () => {
   }
 });
 
-function baseConfig(overrides: Partial<UserConfig> = {}): UserConfig {
+function baseConfig(
+  overrides: Partial<DatabricksUserConfig> = {},
+): DatabricksUserConfig {
   return {
+    destination: "databricks",
     targetTool: "claude-code",
     workspaceUrl: "https://dbc.example.com",
     authMethod: "pat",
@@ -41,9 +48,28 @@ function baseConfig(overrides: Partial<UserConfig> = {}): UserConfig {
   };
 }
 
+function customConfig(
+  overrides: Partial<CustomUserConfig> = {},
+): CustomUserConfig {
+  return {
+    destination: "custom",
+    targetTool: "claude-code",
+    endpoint: "https://otel.example.com",
+    authorizationToken: "custom-token",
+    enabledSignals: ["logs", "metrics", "traces"],
+    settingsTarget: "project",
+    contentOptions: {
+      logUserPrompts: true,
+      logToolDetails: true,
+      logToolContent: true,
+    },
+    ...overrides,
+  };
+}
+
 async function withTempCwd<T>(fn: (dir: string) => Promise<T>): Promise<T> {
   const oldCwd = process.cwd();
-  const dir = await fs.mkdtemp(path.join(os.tmpdir(), "setup-zerobus-otel-"));
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), "setup-agent-otel-"));
   tempDirs.push(dir);
   process.chdir(dir);
   try {
@@ -138,6 +164,82 @@ describe("generateConfig", () => {
     expect(generated.codexConfig?.otel.exporter).not.toBe("none");
     expect(generated.codexConfig?.otel.trace_exporter).toBe("none");
     expect(generated.codexConfig?.otel.metrics_exporter).toBe("none");
+  });
+
+  test("custom destination produces minimal Claude Code env", () => {
+    const generated = generateConfig(customConfig());
+
+    expect(generated.tokenScript).toBeNull();
+    expect(generated.settingsAdditions.otelHeadersHelper).toBeUndefined();
+    expect(generated.codexConfig).toBeUndefined();
+
+    const env = generated.settingsAdditions.env;
+    expect(env.CLAUDE_CODE_ENABLE_TELEMETRY).toBe("1");
+    expect(env.OTEL_EXPORTER_OTLP_LOGS_ENDPOINT).toBe(
+      "https://otel.example.com/v1/logs",
+    );
+    expect(env.OTEL_EXPORTER_OTLP_METRICS_ENDPOINT).toBe(
+      "https://otel.example.com/v1/metrics",
+    );
+    expect(env.OTEL_EXPORTER_OTLP_TRACES_ENDPOINT).toBe(
+      "https://otel.example.com/v1/traces",
+    );
+    expect(env.OTEL_EXPORTER_OTLP_LOGS_HEADERS).toBe(
+      "Authorization=Bearer custom-token,content-type=application/x-protobuf",
+    );
+    expect(env.OTEL_EXPORTER_OTLP_LOGS_HEADERS).not.toContain(
+      "X-Databricks-UC-Table-Name",
+    );
+    expect(env.DATABRICKS_HOST).toBeUndefined();
+  });
+
+  test("custom destination disables non-selected signals", () => {
+    const generated = generateConfig(
+      customConfig({ enabledSignals: ["logs"] }),
+    );
+
+    const env = generated.settingsAdditions.env;
+    expect(env.OTEL_LOGS_EXPORTER).toBe("otlp");
+    expect(env.OTEL_METRICS_EXPORTER).toBe("none");
+    expect(env.OTEL_TRACES_EXPORTER).toBe("none");
+  });
+
+  test("custom destination Codex exporter omits Databricks header", () => {
+    const generated = generateConfig(
+      customConfig({
+        targetTool: "codex",
+        contentOptions: {
+          logUserPrompts: false,
+          logToolDetails: false,
+          logToolContent: false,
+        },
+      }),
+    );
+
+    expect(generated.tokenScript).toBeNull();
+    expect(generated.codexConfig?.otel.exporter).toEqual({
+      "otlp-http": {
+        endpoint: "https://otel.example.com/v1/logs",
+        protocol: "binary",
+        headers: {
+          Authorization: "Bearer custom-token",
+          "content-type": "application/x-protobuf",
+        },
+      },
+    });
+    expect(generated.codexConfig?.otel.trace_exporter).toEqual({
+      "otlp-http": {
+        endpoint: "https://otel.example.com/v1/traces",
+        protocol: "binary",
+        headers: {
+          Authorization: "Bearer custom-token",
+          "content-type": "application/x-protobuf",
+        },
+      },
+    });
+    expect(JSON.stringify(generated.codexConfig)).not.toContain(
+      "X-Databricks-UC-Table-Name",
+    );
   });
 });
 

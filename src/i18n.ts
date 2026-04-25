@@ -8,6 +8,11 @@ export interface Messages {
   selectTargetTool: string;
   targetClaudeCode: string;
   targetCodex: string;
+  selectDestination: string;
+  destinationDatabricks: string;
+  destinationCustom: string;
+  customEndpointPrompt: string;
+  customTokenPrompt: string;
   selectAuthMethod: string;
   authU2m: string;
   authM2m: string;
@@ -50,6 +55,8 @@ export interface Messages {
   // index (banner, preview, summary)
   previewHeader: string;
   previewTarget: string;
+  previewDestination: string;
+  previewEndpoint: string;
   previewTableSetup: string;
   previewTableCreate: string;
   previewTableExisting: string;
@@ -94,6 +101,13 @@ const ja: Messages = {
   selectTargetTool: "どのツールを設定しますか?",
   targetClaudeCode: "Claude Code",
   targetCodex: "Codex",
+  selectDestination: "どの送信先を使用しますか?",
+  destinationDatabricks: "Databricks (Zerobus Ingest)",
+  destinationCustom: "Custom (OTLP/HTTP)",
+  customEndpointPrompt:
+    "OTLP エンドポイントの base URL は何ですか? (例: https://otel.example.com)",
+  customTokenPrompt:
+    "Authorization トークンは何ですか? (Bearer として送信されます)",
   selectAuthMethod: "どの authorization method を使用しますか?",
   authU2m: "OAuth for users (U2M) — Databricks CLI 必須",
   authM2m: "OAuth for service principals (M2M) — client_id + client_secret",
@@ -141,6 +155,8 @@ const ja: Messages = {
 
   previewHeader: "─── 設定プレビュー ───",
   previewTarget: "書き込み先",
+  previewDestination: "送信先",
+  previewEndpoint: "エンドポイント",
   previewTableSetup: "テーブル",
   previewTableCreate: "新規作成",
   previewTableExisting: "既存利用",
@@ -194,6 +210,12 @@ const en: Messages = {
   selectTargetTool: "Which tool would you like to configure?",
   targetClaudeCode: "Claude Code",
   targetCodex: "Codex",
+  selectDestination: "Which destination would you like to use?",
+  destinationDatabricks: "Databricks (Zerobus Ingest)",
+  destinationCustom: "Custom (OTLP/HTTP)",
+  customEndpointPrompt:
+    "What is the OTLP endpoint base URL? (e.g. https://otel.example.com)",
+  customTokenPrompt: "What is the authorization token? (sent as Bearer)",
   selectAuthMethod: "Which authorization method would you like to use?",
   authU2m: "OAuth for users (U2M) — requires Databricks CLI",
   authM2m: "OAuth for service principals (M2M) — client_id + client_secret",
@@ -240,6 +262,8 @@ const en: Messages = {
 
   previewHeader: "─── Configuration Preview ───",
   previewTarget: "Target",
+  previewDestination: "Destination",
+  previewEndpoint: "Endpoint",
   previewTableSetup: "Tables",
   previewTableCreate: "Create",
   previewTableExisting: "Existing",

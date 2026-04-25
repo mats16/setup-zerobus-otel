@@ -4,6 +4,8 @@ import { generateTokenScript } from "./script-generator.js";
 import { fallbackTableName } from "./table-location.js";
 import type {
   CodexExporter,
+  CustomUserConfig,
+  DatabricksUserConfig,
   GeneratedConfig,
   SettingsAdditions,
   Signal,
@@ -60,7 +62,10 @@ function buildCodexHeaders(
   };
 }
 
-function buildCodexExporter(config: UserConfig, signal: Signal): CodexExporter {
+function buildCodexExporter(
+  config: DatabricksUserConfig,
+  signal: Signal,
+): CodexExporter {
   if (!config.enabledSignals.includes(signal)) {
     return "none";
   }
@@ -81,7 +86,7 @@ function buildCodexExporter(config: UserConfig, signal: Signal): CodexExporter {
   };
 }
 
-function generateCodexConfig(config: UserConfig): GeneratedConfig {
+function generateCodexConfig(config: DatabricksUserConfig): GeneratedConfig {
   return {
     settingsAdditions: { env: {} },
     codexConfig: {
@@ -97,11 +102,9 @@ function generateCodexConfig(config: UserConfig): GeneratedConfig {
   };
 }
 
-export function generateConfig(config: UserConfig): GeneratedConfig {
-  if (config.targetTool === "codex") {
-    return generateCodexConfig(config);
-  }
-
+function generateClaudeCodeDatabricksConfig(
+  config: DatabricksUserConfig,
+): GeneratedConfig {
   const {
     workspaceUrl,
     authMethod,
@@ -141,6 +144,73 @@ export function generateConfig(config: UserConfig): GeneratedConfig {
     );
   }
 
+  applyClaudeCodeSharedEnv(env, enabledSignals, contentOptions);
+
+  const settingsAdditions: SettingsAdditions = { env };
+  const tokenScript = generateTokenScript(config);
+
+  if (tokenScript) {
+    settingsAdditions.otelHeadersHelper = collapseTilde(tokenScript.filePath);
+  }
+
+  return { settingsAdditions, tokenScript };
+}
+
+function buildCustomHeaders(token: string): string {
+  return [
+    `Authorization=Bearer ${token}`,
+    "content-type=application/x-protobuf",
+  ].join(",");
+}
+
+function buildCustomCodexHeaders(token: string): Record<string, string> {
+  return {
+    Authorization: `Bearer ${token}`,
+    "content-type": "application/x-protobuf",
+  };
+}
+
+function buildCustomCodexExporter(
+  config: CustomUserConfig,
+  signal: Signal,
+): CodexExporter {
+  if (!config.enabledSignals.includes(signal)) {
+    return "none";
+  }
+  return {
+    "otlp-http": {
+      endpoint: `${config.endpoint}/v1/${SIGNAL_ENDPOINT_PATH[signal]}`,
+      protocol: "binary",
+      headers: buildCustomCodexHeaders(config.authorizationToken),
+    },
+  };
+}
+
+function generateCustomCodexConfig(config: CustomUserConfig): GeneratedConfig {
+  return {
+    settingsAdditions: { env: {} },
+    codexConfig: {
+      otel: {
+        environment: "dev",
+        log_user_prompt: config.contentOptions.logUserPrompts,
+        exporter: buildCustomCodexExporter(config, "logs"),
+        trace_exporter: buildCustomCodexExporter(config, "traces"),
+        metrics_exporter: buildCustomCodexExporter(config, "metrics"),
+      },
+    },
+    tokenScript: null,
+  };
+}
+
+function applyClaudeCodeSharedEnv(
+  env: Record<string, string>,
+  enabledSignals: Signal[],
+  contentOptions: {
+    logUserPrompts: boolean;
+    logToolDetails: boolean;
+    logToolContent: boolean;
+  },
+): void {
   if (enabledSignals.includes("metrics")) {
     env.OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE = "delta";
     env.OTEL_METRIC_EXPORT_INTERVAL = "10000";
@@ -155,13 +225,48 @@ export function generateConfig(config: UserConfig): GeneratedConfig {
   env.OTEL_LOG_USER_PROMPTS = contentOptions.logUserPrompts ? "1" : "0";
   env.OTEL_LOG_TOOL_DETAILS = contentOptions.logToolDetails ? "1" : "0";
   env.OTEL_LOG_TOOL_CONTENT = contentOptions.logToolContent ? "1" : "0";
+}
 
-  const settingsAdditions: SettingsAdditions = { env };
-  const tokenScript = generateTokenScript(config);
+function generateCustomClaudeCodeConfig(
+  config: CustomUserConfig,
+): GeneratedConfig {
+  const { endpoint, authorizationToken, enabledSignals, contentOptions } =
+    config;
 
-  if (tokenScript) {
-    settingsAdditions.otelHeadersHelper = collapseTilde(tokenScript.filePath);
+  const env: Record<string, string> = {};
+  env.CLAUDE_CODE_ENABLE_TELEMETRY = "1";
+  env.CLAUDE_CODE_ENHANCED_TELEMETRY_BETA = "1";
+
+  for (const signal of ALL_SIGNALS) {
+    const key = SIGNAL_ENV_KEY[signal];
+    const enabled = enabledSignals.includes(signal);
+
+    if (!enabled) {
+      env[`OTEL_${key}_EXPORTER`] = "none";
+      continue;
+    }
+
+    env[`OTEL_${key}_EXPORTER`] = "otlp";
+    env[`OTEL_EXPORTER_OTLP_${key}_PROTOCOL`] = "http/protobuf";
+    env[`OTEL_EXPORTER_OTLP_${key}_ENDPOINT`] =
+      `${endpoint}/v1/${SIGNAL_ENDPOINT_PATH[signal]}`;
+    env[`OTEL_EXPORTER_OTLP_${key}_HEADERS`] =
+      buildCustomHeaders(authorizationToken);
   }
 
-  return { settingsAdditions, tokenScript };
+  applyClaudeCodeSharedEnv(env, enabledSignals, contentOptions);
+
+  return { settingsAdditions: { env }, tokenScript: null };
+}
+
+export function generateConfig(config: UserConfig): GeneratedConfig {
+  if (config.destination === "custom") {
+    return config.targetTool === "codex"
+      ? generateCustomCodexConfig(config)
+      : generateCustomClaudeCodeConfig(config);
+  }
+
+  return config.targetTool === "codex"
+    ? generateCodexConfig(config)
+    : generateClaudeCodeDatabricksConfig(config);
 }

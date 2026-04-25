@@ -1,6 +1,10 @@
 import { execFileSync } from "node:child_process";
 import { t } from "./i18n.js";
-import type { SignalTableNames, UcTablePrefix, UserConfig } from "./types.js";
+import type {
+  DatabricksUserConfig,
+  SignalTableNames,
+  UcTablePrefix,
+} from "./types.js";
 
 interface UcTablePrefixResponse {
   catalog_name?: string;
@@ -89,7 +93,7 @@ function getCliAccessToken(profileName: string): string {
   }
 }
 
-async function getAccessToken(config: UserConfig): Promise<string> {
+async function getAccessToken(config: DatabricksUserConfig): Promise<string> {
   if (config.authMethod === "pat") {
     if (!config.pat) throw new Error(t().missingPat);
     return config.pat;
@@ -145,7 +149,7 @@ function isSqlWarehouseResolutionError(message: string): boolean {
 }
 
 async function databricksFetch<T>(
-  config: UserConfig,
+  config: DatabricksUserConfig,
   endpoint: string,
   options: {
     method: "GET" | "POST";
@@ -201,7 +205,9 @@ function isAlreadyExistsError(error: unknown): boolean {
   );
 }
 
-export async function ensureSchemaExists(config: UserConfig): Promise<void> {
+export async function ensureSchemaExists(
+  config: DatabricksUserConfig,
+): Promise<void> {
   const { catalogName, schemaName } = config.tableSetup.location;
   try {
     await databricksFetch(config, "/api/2.1/unity-catalog/schemas", {
@@ -219,7 +225,7 @@ export async function ensureSchemaExists(config: UserConfig): Promise<void> {
 }
 
 export async function createOrGetTraceLocation(
-  config: UserConfig,
+  config: DatabricksUserConfig,
 ): Promise<TraceLocationResult> {
   const body = {
     uc_table_prefix: buildUcTablePrefixBody(config.tableSetup.location),
@@ -243,7 +249,7 @@ export async function createOrGetTraceLocation(
 }
 
 async function getExperimentByName(
-  config: UserConfig,
+  config: DatabricksUserConfig,
   name: string,
 ): Promise<string | null> {
   try {
@@ -260,7 +266,9 @@ async function getExperimentByName(
   }
 }
 
-async function getCurrentUsername(config: UserConfig): Promise<string> {
+async function getCurrentUsername(
+  config: DatabricksUserConfig,
+): Promise<string> {
   const response = await databricksFetch<CurrentUserResponse>(
     config,
     "/api/2.0/preview/scim/v2/Me",
@@ -273,7 +281,7 @@ async function getCurrentUsername(config: UserConfig): Promise<string> {
 }
 
 async function resolveExperimentName(
-  config: UserConfig,
+  config: DatabricksUserConfig,
   name: string,
 ): Promise<string> {
   const trimmedName = name.trim();
@@ -285,7 +293,7 @@ async function resolveExperimentName(
 }
 
 export async function createOrGetExperiment(
-  config: UserConfig,
+  config: DatabricksUserConfig,
   name: string,
 ): Promise<string> {
   const resolvedName = await resolveExperimentName(config, name);
@@ -313,7 +321,7 @@ export async function createOrGetExperiment(
 }
 
 export async function linkExperimentTraceLocation(
-  config: UserConfig,
+  config: DatabricksUserConfig,
   experimentId: string,
 ): Promise<void> {
   const ucTablePrefix = buildUcTablePrefixBody(
