@@ -109,10 +109,10 @@ function printPreview(config: GeneratedConfig, userConfig: UserConfig): void {
 }
 
 async function prepareTables(userConfig: UserConfig): Promise<void> {
-  if (userConfig.destination !== "databricks") {
-    return;
-  }
-  if (userConfig.tableSetup.mode !== "create") {
+  if (
+    userConfig.destination !== "databricks" ||
+    userConfig.tableSetup.mode !== "create"
+  ) {
     return;
   }
 
@@ -180,22 +180,20 @@ function printSummary(
   console.log(`  Signals:  ${userConfig.enabledSignals.join(", ")}`);
   console.log();
 
-  if (userConfig.destination !== "databricks") {
-    return;
-  }
-
-  if (
-    userConfig.authMethod === "u2m" &&
-    userConfig.tableSetup.mode !== "create"
-  ) {
-    const profile = userConfig.profileName ?? "DEFAULT";
-    console.log(t().nextSteps);
-    console.log(t().u2mNextStep(profile));
-    console.log(t().u2mNextStepDesc);
-  } else if (userConfig.authMethod === "m2m") {
-    console.log(t().nextSteps);
-    console.log(t().m2mNextStep1);
-    console.log(t().m2mNextStep2);
+  if (userConfig.destination === "databricks") {
+    if (
+      userConfig.authMethod === "u2m" &&
+      userConfig.tableSetup.mode !== "create"
+    ) {
+      const profile = userConfig.profileName ?? "DEFAULT";
+      console.log(t().nextSteps);
+      console.log(t().u2mNextStep(profile));
+      console.log(t().u2mNextStepDesc);
+    } else if (userConfig.authMethod === "m2m") {
+      console.log(t().nextSteps);
+      console.log(t().m2mNextStep1);
+      console.log(t().m2mNextStep2);
+    }
   }
   console.log();
 }
@@ -217,7 +215,12 @@ async function main(): Promise<void> {
   }
 
   await prepareTables(userConfig);
-  generatedConfig = generateConfig(userConfig);
+  if (
+    userConfig.destination === "databricks" &&
+    userConfig.tableSetup.mode === "create"
+  ) {
+    generatedConfig = generateConfig(userConfig);
+  }
   const result = await applyConfig(
     generatedConfig,
     userConfig.settingsTarget,

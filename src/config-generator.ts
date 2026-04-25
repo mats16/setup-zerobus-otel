@@ -4,11 +4,11 @@ import { generateTokenScript } from "./script-generator.js";
 import { fallbackTableName } from "./table-location.js";
 import type {
   CodexExporter,
-  CustomUserConfig,
-  DatabricksUserConfig,
+  CodexOtlpHttpExporter,
   GeneratedConfig,
   SettingsAdditions,
   Signal,
+  TelemetryContentOptions,
   UserConfig,
 } from "./types.js";
 
@@ -26,6 +26,12 @@ const SIGNAL_ENDPOINT_PATH: Record<Signal, string> = {
 
 const ALL_SIGNALS: Signal[] = ["logs", "metrics", "traces"];
 
+interface SignalEndpoint {
+  url: string;
+  headers: string;
+  codexHeaders: Record<string, string>;
+}
+
 export function expandTilde(p: string): string {
   if (p.startsWith("~/")) {
     return path.join(os.homedir(), p.slice(2));
@@ -41,175 +47,85 @@ function collapseTilde(p: string): string {
   return p;
 }
 
-function buildHeaders(tableName: string, pat?: string): string {
+function buildHeaders(opts: { token?: string; tableName?: string }): string {
   const parts: string[] = [];
-  if (pat) {
-    parts.push(`Authorization=Bearer ${pat}`);
+  if (opts.token) {
+    parts.push(`Authorization=Bearer ${opts.token}`);
   }
   parts.push("content-type=application/x-protobuf");
-  parts.push(`X-Databricks-UC-Table-Name=${tableName}`);
+  if (opts.tableName) {
+    parts.push(`X-Databricks-UC-Table-Name=${opts.tableName}`);
+  }
   return parts.join(",");
 }
 
-function buildCodexHeaders(
-  tableName: string,
-  pat: string,
-): Record<string, string> {
-  return {
-    Authorization: `Bearer ${pat}`,
+function buildCodexHeaders(opts: {
+  token: string;
+  tableName?: string;
+}): Record<string, string> {
+  const headers: Record<string, string> = {
+    Authorization: `Bearer ${opts.token}`,
     "content-type": "application/x-protobuf",
-    "X-Databricks-UC-Table-Name": tableName,
   };
+  if (opts.tableName) {
+    headers["X-Databricks-UC-Table-Name"] = opts.tableName;
+  }
+  return headers;
 }
 
-function buildCodexExporter(
-  config: DatabricksUserConfig,
+function resolveSignalEndpoint(
+  config: UserConfig,
   signal: Signal,
-): CodexExporter {
-  if (!config.enabledSignals.includes(signal)) {
-    return "none";
-  }
-  if (!config.pat) {
-    throw new Error("pat is required for codex auth");
+): SignalEndpoint {
+  const path = SIGNAL_ENDPOINT_PATH[signal];
+
+  if (config.destination === "custom") {
+    const url = `${config.endpoint}/v1/${path}`;
+    return {
+      url,
+      headers: buildHeaders({ token: config.authorizationToken }),
+      codexHeaders: buildCodexHeaders({ token: config.authorizationToken }),
+    };
   }
 
   const tableName =
     config.tableSetup.resolvedTableNames?.[signal] ??
     fallbackTableName(config.tableSetup.location, signal);
-
+  const url = `${config.workspaceUrl}/api/2.0/otel/v1/${path}`;
+  const codexToken = config.pat ?? "";
   return {
-    "otlp-http": {
-      endpoint: `${config.workspaceUrl}/api/2.0/otel/v1/${SIGNAL_ENDPOINT_PATH[signal]}`,
-      protocol: "binary",
-      headers: buildCodexHeaders(tableName, config.pat),
-    },
+    url,
+    headers: buildHeaders({
+      tableName,
+      token: config.authMethod === "pat" ? config.pat : undefined,
+    }),
+    codexHeaders: buildCodexHeaders({ token: codexToken, tableName }),
   };
 }
 
-function generateCodexConfig(config: DatabricksUserConfig): GeneratedConfig {
-  return {
-    settingsAdditions: { env: {} },
-    codexConfig: {
-      otel: {
-        environment: "dev",
-        log_user_prompt: config.contentOptions.logUserPrompts,
-        exporter: buildCodexExporter(config, "logs"),
-        trace_exporter: buildCodexExporter(config, "traces"),
-        metrics_exporter: buildCodexExporter(config, "metrics"),
-      },
-    },
-    tokenScript: null,
-  };
-}
-
-function generateClaudeCodeDatabricksConfig(
-  config: DatabricksUserConfig,
-): GeneratedConfig {
-  const {
-    workspaceUrl,
-    authMethod,
-    enabledSignals,
-    tableSetup,
-    contentOptions,
-  } = config;
-
-  const env: Record<string, string> = {};
-
-  if (authMethod === "m2m") {
-    env.DATABRICKS_HOST = workspaceUrl;
-  }
-  env.CLAUDE_CODE_ENABLE_TELEMETRY = "1";
-  env.CLAUDE_CODE_ENHANCED_TELEMETRY_BETA = "1";
-
+function applySignalEnv(
+  env: Record<string, string>,
+  enabledSignals: Signal[],
+  resolveSignal: (signal: Signal) => SignalEndpoint,
+): void {
   for (const signal of ALL_SIGNALS) {
     const key = SIGNAL_ENV_KEY[signal];
-    const enabled = enabledSignals.includes(signal);
-
-    if (!enabled) {
+    if (!enabledSignals.includes(signal)) {
       env[`OTEL_${key}_EXPORTER`] = "none";
       continue;
     }
-
+    const { url, headers } = resolveSignal(signal);
     env[`OTEL_${key}_EXPORTER`] = "otlp";
     env[`OTEL_EXPORTER_OTLP_${key}_PROTOCOL`] = "http/protobuf";
-    env[`OTEL_EXPORTER_OTLP_${key}_ENDPOINT`] =
-      `${workspaceUrl}/api/2.0/otel/v1/${SIGNAL_ENDPOINT_PATH[signal]}`;
-
-    const tableName =
-      tableSetup.resolvedTableNames?.[signal] ??
-      fallbackTableName(tableSetup.location, signal);
-    env[`OTEL_EXPORTER_OTLP_${key}_HEADERS`] = buildHeaders(
-      tableName,
-      authMethod === "pat" ? config.pat : undefined,
-    );
+    env[`OTEL_EXPORTER_OTLP_${key}_ENDPOINT`] = url;
+    env[`OTEL_EXPORTER_OTLP_${key}_HEADERS`] = headers;
   }
-
-  applyClaudeCodeSharedEnv(env, enabledSignals, contentOptions);
-
-  const settingsAdditions: SettingsAdditions = { env };
-  const tokenScript = generateTokenScript(config);
-
-  if (tokenScript) {
-    settingsAdditions.otelHeadersHelper = collapseTilde(tokenScript.filePath);
-  }
-
-  return { settingsAdditions, tokenScript };
-}
-
-function buildCustomHeaders(token: string): string {
-  return [
-    `Authorization=Bearer ${token}`,
-    "content-type=application/x-protobuf",
-  ].join(",");
-}
-
-function buildCustomCodexHeaders(token: string): Record<string, string> {
-  return {
-    Authorization: `Bearer ${token}`,
-    "content-type": "application/x-protobuf",
-  };
-}
-
-function buildCustomCodexExporter(
-  config: CustomUserConfig,
-  signal: Signal,
-): CodexExporter {
-  if (!config.enabledSignals.includes(signal)) {
-    return "none";
-  }
-  return {
-    "otlp-http": {
-      endpoint: `${config.endpoint}/v1/${SIGNAL_ENDPOINT_PATH[signal]}`,
-      protocol: "binary",
-      headers: buildCustomCodexHeaders(config.authorizationToken),
-    },
-  };
-}
-
-function generateCustomCodexConfig(config: CustomUserConfig): GeneratedConfig {
-  return {
-    settingsAdditions: { env: {} },
-    codexConfig: {
-      otel: {
-        environment: "dev",
-        log_user_prompt: config.contentOptions.logUserPrompts,
-        exporter: buildCustomCodexExporter(config, "logs"),
-        trace_exporter: buildCustomCodexExporter(config, "traces"),
-        metrics_exporter: buildCustomCodexExporter(config, "metrics"),
-      },
-    },
-    tokenScript: null,
-  };
 }
 
 function applyClaudeCodeSharedEnv(
   env: Record<string, string>,
   enabledSignals: Signal[],
-  contentOptions: {
-    logUserPrompts: boolean;
-    logToolDetails: boolean;
-    logToolContent: boolean;
-  },
+  contentOptions: TelemetryContentOptions,
 ): void {
   if (enabledSignals.includes("metrics")) {
     env.OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE = "delta";
@@ -227,46 +143,66 @@ function applyClaudeCodeSharedEnv(
   env.OTEL_LOG_TOOL_CONTENT = contentOptions.logToolContent ? "1" : "0";
 }
 
-function generateCustomClaudeCodeConfig(
-  config: CustomUserConfig,
-): GeneratedConfig {
-  const { endpoint, authorizationToken, enabledSignals, contentOptions } =
-    config;
-
+function generateClaudeCodeConfig(config: UserConfig): GeneratedConfig {
   const env: Record<string, string> = {};
+
+  if (config.destination === "databricks" && config.authMethod === "m2m") {
+    env.DATABRICKS_HOST = config.workspaceUrl;
+  }
   env.CLAUDE_CODE_ENABLE_TELEMETRY = "1";
   env.CLAUDE_CODE_ENHANCED_TELEMETRY_BETA = "1";
 
-  for (const signal of ALL_SIGNALS) {
-    const key = SIGNAL_ENV_KEY[signal];
-    const enabled = enabledSignals.includes(signal);
+  applySignalEnv(env, config.enabledSignals, (signal) =>
+    resolveSignalEndpoint(config, signal),
+  );
+  applyClaudeCodeSharedEnv(env, config.enabledSignals, config.contentOptions);
 
-    if (!enabled) {
-      env[`OTEL_${key}_EXPORTER`] = "none";
-      continue;
-    }
+  const settingsAdditions: SettingsAdditions = { env };
+  const tokenScript =
+    config.destination === "databricks" ? generateTokenScript(config) : null;
 
-    env[`OTEL_${key}_EXPORTER`] = "otlp";
-    env[`OTEL_EXPORTER_OTLP_${key}_PROTOCOL`] = "http/protobuf";
-    env[`OTEL_EXPORTER_OTLP_${key}_ENDPOINT`] =
-      `${endpoint}/v1/${SIGNAL_ENDPOINT_PATH[signal]}`;
-    env[`OTEL_EXPORTER_OTLP_${key}_HEADERS`] =
-      buildCustomHeaders(authorizationToken);
+  if (tokenScript) {
+    settingsAdditions.otelHeadersHelper = collapseTilde(tokenScript.filePath);
   }
 
-  applyClaudeCodeSharedEnv(env, enabledSignals, contentOptions);
+  return { settingsAdditions, tokenScript };
+}
 
-  return { settingsAdditions: { env }, tokenScript: null };
+function buildCodexExporter(config: UserConfig, signal: Signal): CodexExporter {
+  if (!config.enabledSignals.includes(signal)) {
+    return "none";
+  }
+  if (config.destination === "databricks" && !config.pat) {
+    throw new Error("pat is required for codex auth");
+  }
+
+  const { url, codexHeaders } = resolveSignalEndpoint(config, signal);
+  const otlpHttp: CodexOtlpHttpExporter["otlp-http"] = {
+    endpoint: url,
+    protocol: "binary",
+    headers: codexHeaders,
+  };
+  return { "otlp-http": otlpHttp };
+}
+
+function generateCodexConfig(config: UserConfig): GeneratedConfig {
+  return {
+    settingsAdditions: { env: {} },
+    codexConfig: {
+      otel: {
+        environment: "dev",
+        log_user_prompt: config.contentOptions.logUserPrompts,
+        exporter: buildCodexExporter(config, "logs"),
+        trace_exporter: buildCodexExporter(config, "traces"),
+        metrics_exporter: buildCodexExporter(config, "metrics"),
+      },
+    },
+    tokenScript: null,
+  };
 }
 
 export function generateConfig(config: UserConfig): GeneratedConfig {
-  if (config.destination === "custom") {
-    return config.targetTool === "codex"
-      ? generateCustomCodexConfig(config)
-      : generateCustomClaudeCodeConfig(config);
-  }
-
   return config.targetTool === "codex"
     ? generateCodexConfig(config)
-    : generateClaudeCodeDatabricksConfig(config);
+    : generateClaudeCodeConfig(config);
 }
