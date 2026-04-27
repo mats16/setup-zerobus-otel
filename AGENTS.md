@@ -1,41 +1,7 @@
-# CLAUDE.md
+# AGENTS.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+## Project Status
 
-## Project Overview
+This package (`setup-zerobus-otel`) is **deprecated**. The successor is `setup-agent-otel`.
 
-Interactive CLI tool (`npx setup-zerobus-otel`) that configures OpenTelemetry sending from Claude Code to Databricks (zerobus). Based on the reference implementation at https://github.com/akuwano/databricks-cc-otel.
-
-## Commands
-
-```bash
-bun install          # Install dependencies
-bun run build        # Build with tsup → dist/index.js
-bun run dev          # Build in watch mode
-bun run typecheck    # TypeScript type checking (tsc --noEmit)
-node dist/index.js   # Run the built CLI locally
-npx ./               # Test as if installed via npx
-```
-
-## Architecture
-
-The CLI follows a pipeline: **prompts → config generation → file writing**.
-
-- `src/index.ts` — Entry point. Orchestrates the flow: banner → collect input → generate config → preview → confirm → apply → summary.
-- `src/prompts.ts` — All interactive prompts via `@inquirer/prompts`. Exports `collectUserConfig()` which returns a `UserConfig`.
-- `src/config-generator.ts` — Pure logic. Transforms `UserConfig` into `GeneratedConfig` (settings.json env block + optional otelHeadersHelper path). Calls into `script-generator` for token scripts.
-- `src/script-generator.ts` — Generates Node.js scripts for dynamic token retrieval (`gen_otel_headers_u2m.js` / `gen_otel_headers_m2m.js`). Returns `null` for PAT auth.
-- `src/file-writer.ts` — Reads existing `settings.json`, deep-merges new config (preserving hooks, permissions, mcpServers, etc.), writes files, chmod +x on scripts.
-- `src/types.ts` — Shared type definitions. `UserConfig` is the central data model passed between modules.
-
-### Key Design Decisions
-
-- **Package manager**: bun. **Runtime**: Node.js (`#!/usr/bin/env node` shebang via tsup banner) for compatibility with npx/pnpx/bunx.
-- **Deep merge, not overwrite**: `file-writer.ts` merges into existing settings.json. Only `env` and `otelHeadersHelper` keys are touched.
-- **Tilde handling**: Script paths use `os.homedir()` expansion for writing files, but `~/...` form in settings.json (Claude Code resolves `~` itself).
-- **Auth methods**: `u2m` (Databricks CLI), `m2m` (Service Principal OAuth), `pat` (static token in headers). PAT embeds token directly in OTEL headers; u2m/m2m use `otelHeadersHelper`.
-- **Signal mapping**: `traces` signal maps to OTEL env key `TRACES`, endpoint path `traces`, but table suffix `otel_spans`.
-
-## Language
-
-User-facing messages (prompts, banner, summaries) are in Japanese.
+No source code remains in this repository. Only the deprecation notice and package metadata are maintained.

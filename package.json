@@ -1,35 +1,11 @@
 {
   "name": "setup-zerobus-otel",
-  "version": "0.3.1",
-  "description": "Interactive CLI to configure OpenTelemetry sending to Databricks (zerobus) for Claude Code and Codex",
+  "version": "0.3.2",
+  "description": "DEPRECATED: Use setup-agent-otel instead. Interactive CLI to configure OpenTelemetry sending to Databricks for Claude Code and Codex.",
+  "deprecated": "This package has been renamed to setup-agent-otel. Please use npx setup-agent-otel instead.",
   "type": "module",
-  "bin": {
-    "setup-zerobus-otel": "./dist/index.js"
-  },
-  "files": [
-    "dist"
-  ],
-  "scripts": {
-    "build": "tsup",
-    "dev": "tsup --watch",
-    "test": "bun test",
-    "typecheck": "tsc --noEmit",
-    "format": "biome format --write .",
-    "lint": "biome lint .",
-    "check": "biome check --write ."
-  },
   "license": "Apache-2.0",
   "engines": {
     "node": ">=18"
-  },
-  "dependencies": {
-    "@inquirer/prompts": "^7.0.0",
-    "smol-toml": "^1.4.2"
-  },
-  "devDependencies": {
-    "@biomejs/biome": "^2.4.12",
-    "@types/node": "^22.0.0",
-    "tsup": "^8.0.0",
-    "typescript": "^5.5.0"
   }
 }
