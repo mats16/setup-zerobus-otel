@@ -55,8 +55,14 @@ function customConfig(
     destination: "custom",
     targetTool: "claude-code",
     endpoint: "https://otel.example.com",
-    authorizationToken: "custom-token",
+    authScheme: "bearer",
+    authorizationCredential: "custom-token",
     enabledSignals: ["logs", "metrics", "traces"],
+    signalPaths: {
+      logs: "/v1/logs",
+      metrics: "/v1/metrics",
+      traces: "/v1/traces",
+    },
     settingsTarget: "project",
     contentOptions: {
       logUserPrompts: true,
@@ -239,6 +245,42 @@ describe("generateConfig", () => {
     });
     expect(JSON.stringify(generated.codexConfig)).not.toContain(
       "X-Databricks-UC-Table-Name",
+    );
+  });
+
+  test("custom destination supports Basic auth scheme", () => {
+    const generated = generateConfig(
+      customConfig({
+        authScheme: "basic",
+        authorizationCredential: "cGstdGVzdDpzay10ZXN0",
+      }),
+    );
+
+    expect(
+      generated.settingsAdditions.env.OTEL_EXPORTER_OTLP_LOGS_HEADERS,
+    ).toBe(
+      "Authorization=Basic cGstdGVzdDpzay10ZXN0,content-type=application/x-protobuf",
+    );
+  });
+
+  test("custom destination uses Langfuse-style per-signal paths", () => {
+    const generated = generateConfig(
+      customConfig({
+        endpoint: "https://cloud.langfuse.com/api/public/otel",
+        signalPaths: {
+          logs: "/v1/logs",
+          metrics: "/v1/metrics",
+          traces: "/custom/traces",
+        },
+      }),
+    );
+
+    const env = generated.settingsAdditions.env;
+    expect(env.OTEL_EXPORTER_OTLP_LOGS_ENDPOINT).toBe(
+      "https://cloud.langfuse.com/api/public/otel/v1/logs",
+    );
+    expect(env.OTEL_EXPORTER_OTLP_TRACES_ENDPOINT).toBe(
+      "https://cloud.langfuse.com/api/public/otel/custom/traces",
     );
   });
 });

@@ -41,10 +41,11 @@ The full Databricks flow. The CLI asks for your workspace URL, authentication me
 
 A minimal flow for any OTLP/HTTP-compatible backend. The CLI asks for:
 
-- The OTLP base URL (e.g. `https://otel.example.com`). Per-signal endpoints become `<base>/v1/logs`, `<base>/v1/metrics`, `<base>/v1/traces`.
-- A static authorization token, sent as `Authorization: Bearer <token>`.
+- An OTLP base URL. The default is `https://cloud.langfuse.com/api/public/otel` (Langfuse Cloud EU); replace it with any backend you control.
+- An authentication scheme — `Bearer` (static token) or `Basic` (the CLI base64-encodes a `username:password` you enter).
+- A path per enabled signal, defaulted to the standard `/v1/logs`, `/v1/metrics`, `/v1/traces`. Override per-signal as needed.
 
-No Databricks-specific headers, schemas, tables, or MLflow Experiments are created.
+The resulting endpoint is `<base><path>` per signal (e.g. `https://cloud.langfuse.com/api/public/otel/v1/traces`). No Databricks-specific headers, schemas, tables, or MLflow Experiments are created.
 
 ## Requirements
 
@@ -68,7 +69,7 @@ For Claude Code with M2M authentication:
 
 For the **Custom** destination:
 
-- An OTLP/HTTP endpoint and a bearer token
+- An OTLP/HTTP endpoint and credentials for either Bearer or Basic auth
 
 ## Supported Targets
 

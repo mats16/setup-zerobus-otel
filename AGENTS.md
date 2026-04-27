@@ -33,9 +33,10 @@ The CLI follows a pipeline: **prompts → config generation → file writing**.
 - **Package manager**: bun. **Runtime**: Node.js (`#!/usr/bin/env node` shebang via tsup banner) for compatibility with npx/pnpx/bunx.
 - **Deep merge, not overwrite**: `file-writer.ts` merges into existing settings.json. Only `env` and `otelHeadersHelper` keys are touched.
 - **Tilde handling**: Script paths use `os.homedir()` expansion for writing files, but `~/...` form in settings.json (Claude Code resolves `~` itself).
-- **Destinations**: `databricks` (Zerobus Ingest, full UC tables + auth methods + MLflow Experiment) and `custom` (any OTLP/HTTP endpoint with a static bearer token). `UserConfig` is a discriminated union on `destination`; only the Databricks branch carries `workspaceUrl`, `authMethod`, `tableSetup`, etc.
+- **Destinations**: `databricks` (Zerobus Ingest, full UC tables + auth methods + MLflow Experiment) and `custom` (any OTLP/HTTP endpoint, Bearer or Basic auth, per-signal paths defaulted to `/v1/{logs,metrics,traces}`; default base URL is `https://cloud.langfuse.com/api/public/otel`). `UserConfig` is a discriminated union on `destination`.
 - **Auth methods (Databricks only)**: `u2m` (Databricks CLI), `m2m` (Service Principal OAuth), `pat` (static token in headers). PAT embeds token directly in OTEL headers; u2m/m2m use `otelHeadersHelper`.
-- **Signal mapping**: `traces` signal maps to OTEL env key `TRACES`, endpoint path `traces`, but table suffix `otel_spans` (Databricks). For custom, per-signal endpoints are `<base>/v1/{logs,metrics,traces}`.
+- **Custom auth schemes**: `bearer` (token sent verbatim) and `basic` (CLI base64-encodes the entered `username:password` before storing).
+- **Signal mapping**: `traces` signal maps to OTEL env key `TRACES`, endpoint path `traces`, but table suffix `otel_spans` (Databricks). For custom, the URL is `<base><signalPath>` where `signalPath` defaults to `/v1/{signal}` and is user-overridable.
 
 ## Language
 

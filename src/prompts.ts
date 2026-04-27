@@ -5,6 +5,8 @@ import { checkbox, confirm, input, password, select } from "@inquirer/prompts";
 import { type Locale, setLocale, t } from "./i18n.js";
 import type {
   AuthMethod,
+  CustomAuthScheme,
+  CustomSignalPaths,
   Destination,
   ExperimentRetryAction,
   SettingsTarget,
@@ -15,6 +17,14 @@ import type {
   TelemetryContentOptions,
   UserConfig,
 } from "./types.js";
+
+const LANGFUSE_DEFAULT_ENDPOINT = "https://cloud.langfuse.com/api/public/otel";
+
+const SIGNAL_DEFAULT_PATH: Record<Signal, string> = {
+  logs: "/v1/logs",
+  metrics: "/v1/metrics",
+  traces: "/v1/traces",
+};
 
 export async function promptLocale(): Promise<Locale> {
   return select({
@@ -61,6 +71,7 @@ async function promptDestination(): Promise<Destination> {
 async function promptCustomEndpoint(): Promise<string> {
   const url = await input({
     message: t().customEndpointPrompt,
+    default: LANGFUSE_DEFAULT_ENDPOINT,
     validate: (value) => {
       const normalized = normalizeUrl(value);
       try {
@@ -80,14 +91,50 @@ async function promptCustomEndpoint(): Promise<string> {
   return normalizeUrl(url);
 }
 
-async function promptCustomToken(): Promise<string> {
-  return password({
-    message: t().customTokenPrompt,
+async function promptCustomAuthScheme(): Promise<CustomAuthScheme> {
+  return select({
+    message: t().selectCustomAuthScheme,
+    choices: [
+      { name: t().customAuthBearer, value: "bearer" as const },
+      { name: t().customAuthBasic, value: "basic" as const },
+    ],
+  });
+}
+
+async function promptCustomCredential(
+  scheme: CustomAuthScheme,
+): Promise<string> {
+  const message =
+    scheme === "basic"
+      ? t().customBasicCredentialPrompt
+      : t().customBearerTokenPrompt;
+  const raw = await password({
+    message,
     validate: (value) => {
       if (!value) return t().tokenRequired;
       return true;
     },
   });
+  return scheme === "basic" ? Buffer.from(raw, "utf8").toString("base64") : raw;
+}
+
+async function promptCustomSignalPaths(
+  enabledSignals: Signal[],
+): Promise<CustomSignalPaths> {
+  const paths: CustomSignalPaths = {};
+  for (const signal of enabledSignals) {
+    const path = await input({
+      message: t().customSignalPathPrompt(signal),
+      default: SIGNAL_DEFAULT_PATH[signal],
+      validate: (value) => {
+        const trimmed = value.trim();
+        if (!trimmed.startsWith("/")) return t().customSignalPathValidation;
+        return true;
+      },
+    });
+    paths[signal] = path.trim();
+  }
+  return paths;
 }
 
 function normalizeUrl(value: string): string {
@@ -450,9 +497,11 @@ export async function collectUserConfig(): Promise<UserConfig> {
 
   if (destination === "custom") {
     const endpoint = await promptCustomEndpoint();
-    const authorizationToken = await promptCustomToken();
-    const settingsTarget = await promptSettingsTarget(targetTool);
+    const authScheme = await promptCustomAuthScheme();
+    const authorizationCredential = await promptCustomCredential(authScheme);
     const enabledSignals = await promptSignals();
+    const signalPaths = await promptCustomSignalPaths(enabledSignals);
+    const settingsTarget = await promptSettingsTarget(targetTool);
     const contentOptions =
       targetTool === "codex"
         ? await promptCodexContentOptions()
@@ -462,8 +511,10 @@ export async function collectUserConfig(): Promise<UserConfig> {
       destination: "custom",
       targetTool,
       endpoint,
-      authorizationToken,
+      authScheme,
+      authorizationCredential,
       enabledSignals,
+      signalPaths,
       settingsTarget,
       contentOptions,
     };

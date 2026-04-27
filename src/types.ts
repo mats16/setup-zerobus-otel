@@ -51,10 +51,16 @@ export interface DatabricksUserConfig extends BaseUserConfig {
   tableSetup: TableSetupConfig;
 }
 
+export type CustomAuthScheme = "bearer" | "basic";
+
+export type CustomSignalPaths = Partial<Record<Signal, string>>;
+
 export interface CustomUserConfig extends BaseUserConfig {
   destination: "custom";
   endpoint: string;
-  authorizationToken: string;
+  authScheme: CustomAuthScheme;
+  authorizationCredential: string;
+  signalPaths: CustomSignalPaths;
 }
 
 export type UserConfig = DatabricksUserConfig | CustomUserConfig;

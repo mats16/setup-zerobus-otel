@@ -47,10 +47,15 @@ function collapseTilde(p: string): string {
   return p;
 }
 
-function buildHeaders(opts: { token?: string; tableName?: string }): string {
+interface AuthHeader {
+  scheme: "Bearer" | "Basic";
+  credential: string;
+}
+
+function buildHeaders(opts: { auth?: AuthHeader; tableName?: string }): string {
   const parts: string[] = [];
-  if (opts.token) {
-    parts.push(`Authorization=Bearer ${opts.token}`);
+  if (opts.auth) {
+    parts.push(`Authorization=${opts.auth.scheme} ${opts.auth.credential}`);
   }
   parts.push("content-type=application/x-protobuf");
   if (opts.tableName) {
@@ -60,11 +65,11 @@ function buildHeaders(opts: { token?: string; tableName?: string }): string {
 }
 
 function buildCodexHeaders(opts: {
-  token: string;
+  auth: AuthHeader;
   tableName?: string;
 }): Record<string, string> {
   const headers: Record<string, string> = {
-    Authorization: `Bearer ${opts.token}`,
+    Authorization: `${opts.auth.scheme} ${opts.auth.credential}`,
     "content-type": "application/x-protobuf",
   };
   if (opts.tableName) {
@@ -77,29 +82,36 @@ function resolveSignalEndpoint(
   config: UserConfig,
   signal: Signal,
 ): SignalEndpoint {
-  const path = SIGNAL_ENDPOINT_PATH[signal];
-
   if (config.destination === "custom") {
-    const url = `${config.endpoint}/v1/${path}`;
+    const path =
+      config.signalPaths[signal] ?? `/v1/${SIGNAL_ENDPOINT_PATH[signal]}`;
+    const auth: AuthHeader = {
+      scheme: config.authScheme === "basic" ? "Basic" : "Bearer",
+      credential: config.authorizationCredential,
+    };
     return {
-      url,
-      headers: buildHeaders({ token: config.authorizationToken }),
-      codexHeaders: buildCodexHeaders({ token: config.authorizationToken }),
+      url: `${config.endpoint}${path}`,
+      headers: buildHeaders({ auth }),
+      codexHeaders: buildCodexHeaders({ auth }),
     };
   }
 
   const tableName =
     config.tableSetup.resolvedTableNames?.[signal] ??
     fallbackTableName(config.tableSetup.location, signal);
-  const url = `${config.workspaceUrl}/api/2.0/otel/v1/${path}`;
-  const codexToken = config.pat ?? "";
+  const url = `${config.workspaceUrl}/api/2.0/otel/v1/${SIGNAL_ENDPOINT_PATH[signal]}`;
+  const claudeAuth: AuthHeader | undefined =
+    config.authMethod === "pat" && config.pat
+      ? { scheme: "Bearer", credential: config.pat }
+      : undefined;
+  const codexAuth: AuthHeader = {
+    scheme: "Bearer",
+    credential: config.pat ?? "",
+  };
   return {
     url,
-    headers: buildHeaders({
-      tableName,
-      token: config.authMethod === "pat" ? config.pat : undefined,
-    }),
-    codexHeaders: buildCodexHeaders({ token: codexToken, tableName }),
+    headers: buildHeaders({ auth: claudeAuth, tableName }),
+    codexHeaders: buildCodexHeaders({ auth: codexAuth, tableName }),
   };
 }
 

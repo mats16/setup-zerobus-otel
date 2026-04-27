@@ -12,7 +12,13 @@ export interface Messages {
   destinationDatabricks: string;
   destinationCustom: string;
   customEndpointPrompt: string;
-  customTokenPrompt: string;
+  selectCustomAuthScheme: string;
+  customAuthBearer: string;
+  customAuthBasic: string;
+  customBearerTokenPrompt: string;
+  customBasicCredentialPrompt: string;
+  customSignalPathPrompt: (signal: string) => string;
+  customSignalPathValidation: string;
   selectAuthMethod: string;
   authU2m: string;
   authM2m: string;
@@ -104,10 +110,17 @@ const ja: Messages = {
   selectDestination: "どの送信先を使用しますか?",
   destinationDatabricks: "Databricks (Zerobus Ingest)",
   destinationCustom: "Custom (OTLP/HTTP)",
-  customEndpointPrompt:
-    "OTLP エンドポイントの base URL は何ですか? (例: https://otel.example.com)",
-  customTokenPrompt:
-    "Authorization トークンは何ですか? (Bearer として送信されます)",
+  customEndpointPrompt: "OTLP エンドポイントの base URL は何ですか?",
+  selectCustomAuthScheme: "認証スキームはどれですか?",
+  customAuthBearer: "Bearer (静的トークンを Bearer ヘッダーで送信)",
+  customAuthBasic:
+    "Basic (username:password を base64 化して Basic ヘッダーで送信)",
+  customBearerTokenPrompt: "Authorization トークンは何ですか?",
+  customBasicCredentialPrompt:
+    "Basic 認証の credential (username:password) は何ですか?",
+  customSignalPathPrompt: (signal) =>
+    `${signal} のパスは? (base URL に追加されます)`,
+  customSignalPathValidation: "パスは / で始めてください",
   selectAuthMethod: "どの authorization method を使用しますか?",
   authU2m: "OAuth for users (U2M) — Databricks CLI 必須",
   authM2m: "OAuth for service principals (M2M) — client_id + client_secret",
@@ -213,9 +226,17 @@ const en: Messages = {
   selectDestination: "Which destination would you like to use?",
   destinationDatabricks: "Databricks (Zerobus Ingest)",
   destinationCustom: "Custom (OTLP/HTTP)",
-  customEndpointPrompt:
-    "What is the OTLP endpoint base URL? (e.g. https://otel.example.com)",
-  customTokenPrompt: "What is the authorization token? (sent as Bearer)",
+  customEndpointPrompt: "What is the OTLP endpoint base URL?",
+  selectCustomAuthScheme: "Which authentication scheme?",
+  customAuthBearer: "Bearer (static token sent as Bearer header)",
+  customAuthBasic:
+    "Basic (username:password base64-encoded and sent as Basic header)",
+  customBearerTokenPrompt: "What is the authorization token?",
+  customBasicCredentialPrompt:
+    "What is the Basic auth credential (username:password)?",
+  customSignalPathPrompt: (signal) =>
+    `What path for ${signal}? (appended to the base URL)`,
+  customSignalPathValidation: "The path must start with /",
   selectAuthMethod: "Which authorization method would you like to use?",
   authU2m: "OAuth for users (U2M) — requires Databricks CLI",
   authM2m: "OAuth for service principals (M2M) — client_id + client_secret",
