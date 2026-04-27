@@ -8,6 +8,17 @@ export interface Messages {
   selectTargetTool: string;
   targetClaudeCode: string;
   targetCodex: string;
+  selectDestination: string;
+  destinationDatabricks: string;
+  destinationCustom: string;
+  customEndpointPrompt: string;
+  selectCustomAuthScheme: string;
+  customAuthBearer: string;
+  customAuthBasic: string;
+  customBearerTokenPrompt: string;
+  customBasicCredentialPrompt: string;
+  customSignalPathPrompt: (signal: string) => string;
+  customSignalPathValidation: string;
   selectAuthMethod: string;
   authU2m: string;
   authM2m: string;
@@ -50,6 +61,8 @@ export interface Messages {
   // index (banner, preview, summary)
   previewHeader: string;
   previewTarget: string;
+  previewDestination: string;
+  previewEndpoint: string;
   previewTableSetup: string;
   previewTableCreate: string;
   previewTableExisting: string;
@@ -94,6 +107,20 @@ const ja: Messages = {
   selectTargetTool: "どのツールを設定しますか?",
   targetClaudeCode: "Claude Code",
   targetCodex: "Codex",
+  selectDestination: "どの送信先を使用しますか?",
+  destinationDatabricks: "Databricks (Zerobus Ingest)",
+  destinationCustom: "Custom (OTLP/HTTP)",
+  customEndpointPrompt: "OTLP エンドポイントの base URL は何ですか?",
+  selectCustomAuthScheme: "認証スキームはどれですか?",
+  customAuthBearer: "Bearer (静的トークンを Bearer ヘッダーで送信)",
+  customAuthBasic:
+    "Basic (username:password を base64 化して Basic ヘッダーで送信)",
+  customBearerTokenPrompt: "Authorization トークンは何ですか?",
+  customBasicCredentialPrompt:
+    "Basic 認証の credential (username:password) は何ですか?",
+  customSignalPathPrompt: (signal) =>
+    `${signal} のパスは? (base URL に追加されます)`,
+  customSignalPathValidation: "パスは / で始めてください",
   selectAuthMethod: "どの authorization method を使用しますか?",
   authU2m: "OAuth for users (U2M) — Databricks CLI 必須",
   authM2m: "OAuth for service principals (M2M) — client_id + client_secret",
@@ -141,6 +168,8 @@ const ja: Messages = {
 
   previewHeader: "─── 設定プレビュー ───",
   previewTarget: "書き込み先",
+  previewDestination: "送信先",
+  previewEndpoint: "エンドポイント",
   previewTableSetup: "テーブル",
   previewTableCreate: "新規作成",
   previewTableExisting: "既存利用",
@@ -194,6 +223,20 @@ const en: Messages = {
   selectTargetTool: "Which tool would you like to configure?",
   targetClaudeCode: "Claude Code",
   targetCodex: "Codex",
+  selectDestination: "Which destination would you like to use?",
+  destinationDatabricks: "Databricks (Zerobus Ingest)",
+  destinationCustom: "Custom (OTLP/HTTP)",
+  customEndpointPrompt: "What is the OTLP endpoint base URL?",
+  selectCustomAuthScheme: "Which authentication scheme?",
+  customAuthBearer: "Bearer (static token sent as Bearer header)",
+  customAuthBasic:
+    "Basic (username:password base64-encoded and sent as Basic header)",
+  customBearerTokenPrompt: "What is the authorization token?",
+  customBasicCredentialPrompt:
+    "What is the Basic auth credential (username:password)?",
+  customSignalPathPrompt: (signal) =>
+    `What path for ${signal}? (appended to the base URL)`,
+  customSignalPathValidation: "The path must start with /",
   selectAuthMethod: "Which authorization method would you like to use?",
   authU2m: "OAuth for users (U2M) — requires Databricks CLI",
   authM2m: "OAuth for service principals (M2M) — client_id + client_secret",
@@ -240,6 +283,8 @@ const en: Messages = {
 
   previewHeader: "─── Configuration Preview ───",
   previewTarget: "Target",
+  previewDestination: "Destination",
+  previewEndpoint: "Endpoint",
   previewTableSetup: "Tables",
   previewTableCreate: "Create",
   previewTableExisting: "Existing",

@@ -5,6 +5,9 @@ import { checkbox, confirm, input, password, select } from "@inquirer/prompts";
 import { type Locale, setLocale, t } from "./i18n.js";
 import type {
   AuthMethod,
+  CustomAuthScheme,
+  CustomSignalPaths,
+  Destination,
   ExperimentRetryAction,
   SettingsTarget,
   Signal,
@@ -14,6 +17,14 @@ import type {
   TelemetryContentOptions,
   UserConfig,
 } from "./types.js";
+
+const LANGFUSE_DEFAULT_ENDPOINT = "https://cloud.langfuse.com/api/public/otel";
+
+const SIGNAL_DEFAULT_PATH: Record<Signal, string> = {
+  logs: "/v1/logs",
+  metrics: "/v1/metrics",
+  traces: "/v1/traces",
+};
 
 export async function promptLocale(): Promise<Locale> {
   return select({
@@ -39,6 +50,91 @@ async function promptTargetTool(): Promise<TargetTool> {
       },
     ],
   });
+}
+
+async function promptDestination(): Promise<Destination> {
+  return select({
+    message: t().selectDestination,
+    choices: [
+      {
+        name: t().destinationDatabricks,
+        value: "databricks" as const,
+      },
+      {
+        name: t().destinationCustom,
+        value: "custom" as const,
+      },
+    ],
+  });
+}
+
+async function promptCustomEndpoint(): Promise<string> {
+  const url = await input({
+    message: t().customEndpointPrompt,
+    default: LANGFUSE_DEFAULT_ENDPOINT,
+    validate: (value) => {
+      const normalized = normalizeUrl(value);
+      try {
+        const parsed = new URL(normalized);
+        if (parsed.protocol !== "https:" && parsed.protocol !== "http:") {
+          return t().enterValidUrl;
+        }
+        if (!parsed.hostname) {
+          return t().enterValidHostname;
+        }
+      } catch {
+        return t().enterValidUrl;
+      }
+      return true;
+    },
+  });
+  return normalizeUrl(url);
+}
+
+async function promptCustomAuthScheme(): Promise<CustomAuthScheme> {
+  return select({
+    message: t().selectCustomAuthScheme,
+    choices: [
+      { name: t().customAuthBearer, value: "bearer" as const },
+      { name: t().customAuthBasic, value: "basic" as const },
+    ],
+  });
+}
+
+async function promptCustomCredential(
+  scheme: CustomAuthScheme,
+): Promise<string> {
+  const message =
+    scheme === "basic"
+      ? t().customBasicCredentialPrompt
+      : t().customBearerTokenPrompt;
+  const raw = await password({
+    message,
+    validate: (value) => {
+      if (!value) return t().tokenRequired;
+      return true;
+    },
+  });
+  return scheme === "basic" ? Buffer.from(raw, "utf8").toString("base64") : raw;
+}
+
+async function promptCustomSignalPaths(
+  enabledSignals: Signal[],
+): Promise<CustomSignalPaths> {
+  const paths: CustomSignalPaths = {};
+  for (const signal of enabledSignals) {
+    const path = await input({
+      message: t().customSignalPathPrompt(signal),
+      default: SIGNAL_DEFAULT_PATH[signal],
+      validate: (value) => {
+        const trimmed = value.trim();
+        if (!trimmed.startsWith("/")) return t().customSignalPathValidation;
+        return true;
+      },
+    });
+    paths[signal] = path.trim();
+  }
+  return paths;
 }
 
 function normalizeUrl(value: string): string {
@@ -397,6 +493,33 @@ export async function collectUserConfig(): Promise<UserConfig> {
   setLocale(locale);
 
   const targetTool = await promptTargetTool();
+  const destination = await promptDestination();
+
+  if (destination === "custom") {
+    const endpoint = await promptCustomEndpoint();
+    const authScheme = await promptCustomAuthScheme();
+    const authorizationCredential = await promptCustomCredential(authScheme);
+    const enabledSignals = await promptSignals();
+    const signalPaths = await promptCustomSignalPaths(enabledSignals);
+    const settingsTarget = await promptSettingsTarget(targetTool);
+    const contentOptions =
+      targetTool === "codex"
+        ? await promptCodexContentOptions()
+        : await promptContentOptions();
+
+    return {
+      destination: "custom",
+      targetTool,
+      endpoint,
+      authScheme,
+      authorizationCredential,
+      enabledSignals,
+      signalPaths,
+      settingsTarget,
+      contentOptions,
+    };
+  }
+
   const authMethod = targetTool === "codex" ? "pat" : await promptAuthMethod();
   if (targetTool === "codex") {
     console.log(t().codexPatOnlyNotice);
@@ -430,6 +553,7 @@ export async function collectUserConfig(): Promise<UserConfig> {
   }
 
   return {
+    destination: "databricks",
     targetTool,
     workspaceUrl,
     authMethod,

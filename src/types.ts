@@ -1,5 +1,7 @@
 export type TargetTool = "claude-code" | "codex";
 
+export type Destination = "databricks" | "custom";
+
 export type AuthMethod = "u2m" | "m2m" | "pat";
 
 export type Signal = "logs" | "metrics" | "traces";
@@ -32,18 +34,36 @@ export interface TableSetupConfig {
   experimentId?: string;
 }
 
-export interface UserConfig {
+interface BaseUserConfig {
   targetTool: TargetTool;
+  enabledSignals: Signal[];
+  settingsTarget: SettingsTarget;
+  contentOptions: TelemetryContentOptions;
+}
+
+export interface DatabricksUserConfig extends BaseUserConfig {
+  destination: "databricks";
   workspaceUrl: string;
   authMethod: AuthMethod;
   scriptLocation: string;
   profileName?: string;
   pat?: string;
-  enabledSignals: Signal[];
   tableSetup: TableSetupConfig;
-  settingsTarget: SettingsTarget;
-  contentOptions: TelemetryContentOptions;
 }
+
+export type CustomAuthScheme = "bearer" | "basic";
+
+export type CustomSignalPaths = Partial<Record<Signal, string>>;
+
+export interface CustomUserConfig extends BaseUserConfig {
+  destination: "custom";
+  endpoint: string;
+  authScheme: CustomAuthScheme;
+  authorizationCredential: string;
+  signalPaths: CustomSignalPaths;
+}
+
+export type UserConfig = DatabricksUserConfig | CustomUserConfig;
 
 export interface GeneratedConfig {
   settingsAdditions: SettingsAdditions;
