@@ -1,6 +1,6 @@
 {
   "name": "setup-agent-otel",
-  "version": "0.3.2",
+  "version": "0.3.3",
   "description": "Interactive CLI to configure OpenTelemetry sending from Claude Code or Codex to Databricks Zerobus Ingest or any OTLP/HTTP backend",
   "type": "module",
   "bin": {
