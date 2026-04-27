@@ -95,6 +95,18 @@ describe("generateConfig", () => {
       "1",
     );
     expect(
+      generated.settingsAdditions.env.CLAUDE_CODE_ENHANCED_TELEMETRY_BETA,
+    ).toBe("1");
+    expect(
+      generated.settingsAdditions.env.OTEL_METRIC_EXPORT_INTERVAL,
+    ).toBeUndefined();
+    expect(
+      generated.settingsAdditions.env.OTEL_LOGS_EXPORT_INTERVAL,
+    ).toBeUndefined();
+    expect(
+      generated.settingsAdditions.env.OTEL_TRACES_EXPORT_INTERVAL,
+    ).toBeUndefined();
+    expect(
       generated.settingsAdditions.env.OTEL_EXPORTER_OTLP_LOGS_ENDPOINT,
     ).toBe("https://dbc.example.com/api/2.0/otel/v1/logs");
     expect(
@@ -208,6 +220,8 @@ describe("generateConfig", () => {
     expect(env.OTEL_LOGS_EXPORTER).toBe("otlp");
     expect(env.OTEL_METRICS_EXPORTER).toBe("none");
     expect(env.OTEL_TRACES_EXPORTER).toBe("none");
+    expect(env.CLAUDE_CODE_ENHANCED_TELEMETRY_BETA).toBeUndefined();
+    expect(env.OTEL_LOG_TOOL_CONTENT).toBe("0");
   });
 
   test("custom destination Codex exporter omits Databricks header", () => {

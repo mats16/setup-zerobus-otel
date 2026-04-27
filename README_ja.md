@@ -77,6 +77,8 @@ Claude Code で M2M 認証を使う場合:
 
 Claude Code の設定ファイルに `env` と、必要に応じて `otelHeadersHelper` を追加します。
 
+生成される `env` は Claude Code の monitoring 設定に沿っています。`CLAUDE_CODE_ENABLE_TELEMETRY=1` で telemetry を有効化し、選択したシグナルごとに OTEL exporter / protocol / endpoint / header を設定します。`CLAUDE_CODE_ENHANCED_TELEMETRY_BETA=1` は Traces を選んだ場合だけ設定します。
+
 書き込み先は実行時に選択できます。
 
 - Global: `~/.claude/settings.json`
@@ -93,7 +95,7 @@ Claude Code の設定ファイルに `env` と、必要に応じて `otelHeaders
 
 U2M / M2M では token helper script を生成し、Claude Code の `otelHeadersHelper` に設定します。
 
-Custom 送信先では、入力された静的 bearer token をそのまま使用します。helper script は生成されません。
+Custom 送信先では、入力された静的な Bearer または Basic credential をそのまま使用します。helper script は生成されません。
 
 ### Codex
 
@@ -143,6 +145,8 @@ Claude Code では、テレメトリに含める内容も選択できます。
 - ユーザープロンプト
 - ツール実行詳細
 - ツール入出力内容
+
+ツール入出力内容は trace span 経由で出力されるため、CLI は Traces が選択されている場合だけこの項目を有効化します。
 
 Codex では、OTEL logs にユーザープロンプト本文を含めるかを選択できます。
 

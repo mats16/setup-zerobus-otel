@@ -141,18 +141,14 @@ function applyClaudeCodeSharedEnv(
 ): void {
   if (enabledSignals.includes("metrics")) {
     env.OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE = "delta";
-    env.OTEL_METRIC_EXPORT_INTERVAL = "10000";
-  }
-  if (enabledSignals.includes("logs")) {
-    env.OTEL_LOGS_EXPORT_INTERVAL = "5000";
-  }
-  if (enabledSignals.includes("traces")) {
-    env.OTEL_TRACES_EXPORT_INTERVAL = "1000";
   }
 
   env.OTEL_LOG_USER_PROMPTS = contentOptions.logUserPrompts ? "1" : "0";
   env.OTEL_LOG_TOOL_DETAILS = contentOptions.logToolDetails ? "1" : "0";
-  env.OTEL_LOG_TOOL_CONTENT = contentOptions.logToolContent ? "1" : "0";
+  env.OTEL_LOG_TOOL_CONTENT =
+    enabledSignals.includes("traces") && contentOptions.logToolContent
+      ? "1"
+      : "0";
 }
 
 function generateClaudeCodeConfig(config: UserConfig): GeneratedConfig {
@@ -162,7 +158,9 @@ function generateClaudeCodeConfig(config: UserConfig): GeneratedConfig {
     env.DATABRICKS_HOST = config.workspaceUrl;
   }
   env.CLAUDE_CODE_ENABLE_TELEMETRY = "1";
-  env.CLAUDE_CODE_ENHANCED_TELEMETRY_BETA = "1";
+  if (config.enabledSignals.includes("traces")) {
+    env.CLAUDE_CODE_ENHANCED_TELEMETRY_BETA = "1";
+  }
 
   applySignalEnv(env, config.enabledSignals, (signal) =>
     resolveSignalEndpoint(config, signal),

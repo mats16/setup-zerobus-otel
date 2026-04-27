@@ -77,6 +77,8 @@ For the **Custom** destination:
 
 For Claude Code, this CLI adds `env` and, when needed, `otelHeadersHelper` to the Claude Code settings file.
 
+The generated `env` block follows Claude Code's monitoring configuration: it enables telemetry with `CLAUDE_CODE_ENABLE_TELEMETRY=1`, writes OTEL exporter / protocol / endpoint / header variables per selected signal, and enables `CLAUDE_CODE_ENHANCED_TELEMETRY_BETA=1` only when Traces are selected.
+
 You can choose the target settings scope during setup.
 
 - Global: `~/.claude/settings.json`
@@ -93,7 +95,7 @@ Authentication methods (Databricks destination only):
 
 For U2M and M2M, the CLI generates a token helper script and configures it as Claude Code's `otelHeadersHelper`.
 
-The Custom destination always uses the static bearer token you provide; no helper script is generated.
+The Custom destination always uses the static Bearer or Basic credential you provide; no helper script is generated.
 
 ### Codex
 
@@ -143,6 +145,8 @@ For Claude Code, you can also choose which content is included in telemetry:
 - User prompts
 - Tool execution details
 - Tool input/output content
+
+Tool input/output content is emitted through trace spans, so the CLI only enables that option when Traces are selected.
 
 For Codex, you can choose whether to include raw user prompts in OTEL logs.
 

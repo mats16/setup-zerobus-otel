@@ -447,7 +447,10 @@ export async function promptExperimentRetryAction(): Promise<ExperimentRetryActi
   });
 }
 
-async function promptContentOptions(): Promise<TelemetryContentOptions> {
+async function promptContentOptions(
+  enabledSignals: Signal[],
+): Promise<TelemetryContentOptions> {
+  const tracesEnabled = enabledSignals.includes("traces");
   const selected = await checkbox({
     message: t().selectContentOptions,
     choices: [
@@ -461,18 +464,22 @@ async function promptContentOptions(): Promise<TelemetryContentOptions> {
         value: "logToolDetails" as const,
         checked: true,
       },
-      {
-        name: t().contentToolContent,
-        value: "logToolContent" as const,
-        checked: true,
-      },
+      ...(tracesEnabled
+        ? [
+            {
+              name: t().contentToolContent,
+              value: "logToolContent" as const,
+              checked: true,
+            },
+          ]
+        : []),
     ],
   });
 
   return {
     logUserPrompts: selected.includes("logUserPrompts"),
     logToolDetails: selected.includes("logToolDetails"),
-    logToolContent: selected.includes("logToolContent"),
+    logToolContent: tracesEnabled && selected.includes("logToolContent"),
   };
 }
 
@@ -505,7 +512,7 @@ export async function collectUserConfig(): Promise<UserConfig> {
     const contentOptions =
       targetTool === "codex"
         ? await promptCodexContentOptions()
-        : await promptContentOptions();
+        : await promptContentOptions(enabledSignals);
 
     return {
       destination: "custom",
@@ -547,7 +554,7 @@ export async function collectUserConfig(): Promise<UserConfig> {
   const contentOptions =
     targetTool === "codex"
       ? await promptCodexContentOptions()
-      : await promptContentOptions();
+      : await promptContentOptions(enabledSignals);
   if (targetTool === "claude-code" && authMethod !== "pat") {
     scriptLocation = await promptScriptLocation();
   }

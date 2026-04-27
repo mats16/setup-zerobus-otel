@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Interactive CLI tool (`npx setup-agent-otel`) that configures OpenTelemetry sending from Claude Code or Codex to Databricks Zerobus Ingest, or to any custom OTLP/HTTP backend. Based on the reference implementation at https://github.com/akuwano/databricks-cc-otel.
+Interactive CLI tool (`npx setup-agent-otel`) that configures OpenTelemetry sending from Claude Code or Codex to Databricks Zerobus Ingest, or to any custom OTLP/HTTP backend.
 
 ## Commands
 
